@@ -1,0 +1,6 @@
+
+data/
+.idea/
+build/
+
+notebooks/.ipynb_checkpoints/
