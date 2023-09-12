@@ -20,8 +20,8 @@ files = ['notebooks/*.*', 'data/*.*']
 ## Version management copied form numpy
 ## Thanks to them!
 MAJOR               = 0
-MINOR               = 0
-MICRO               = 1
+MINOR               = 1
+MICRO               = 0
 ISRELEASED          = False
 VERSION             = '%d.%d.%s' % (MAJOR, MINOR, MICRO)
 

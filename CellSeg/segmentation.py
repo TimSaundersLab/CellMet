@@ -111,28 +111,24 @@ class Segmentation:
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
             img_cell = csimage.get_label(img_cell_dil, 1).astype("uint8")
-            # img_cell = img_cell_dil.copy()
-            # img_cell[img_cell == 2] = 0
             img_cell_dil[img_cell_dil == 2] = 1
 
             data_ = csimage.find_cell_axis_center(img_cell, self.pixel_size, resize_image=True)
-            # data_ = pd.read_csv(
-            #     os.path.join(self.storage_path, "unique_cell/Center_fibre_coords/" + str(c_id) + ".csv"))
-            # if "x.micron" in data_.columns:
-            #     data_["X.micron"] = data_["x.micron"]
 
             # measure nb neighbours
             neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
-            neighbours_id = np.delete(neighbours_id, np.where(neighbours_id == c_id))
+            # neighbours_id = np.delete(neighbours_id, np.where(neighbours_id == c_id))
 
             # Get center of the cell
-            z, y, x = np.array(np.where(img_cell > 0)).mean(axis=1)
+            # z, y, x = np.array(np.where(img_cell > 0)).mean(axis=1)
+            sparce_cell = sparse.COO.from_numpy(img_cell)
+            z, y, x = sparce_cell.coords.mean(axis=1)
 
             c_info = pd.DataFrame.from_dict({"id_im": c_id,
                                              "x_center": x,
                                              "y_center": y,
                                              "z_center": z,
-                                             "nb_neighbor": len(neighbours_id),
+                                             "nb_neighbor": len(neighbours_id)-1,
                                              },
                                             orient="index").T
 
@@ -190,6 +186,19 @@ class Segmentation:
 
             # For each edge
             for cb, cc in cell_combi:
+                sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(cb)) + ".npz"))
+                img_cell_b_dil = sp_mat.todense()
+                img_cell_b_dil[img_cell_b_dil == 2] = 1
+
+                sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(cc)) + ".npz"))
+                img_cell_c_dil = sp_mat.todense()
+                img_cell_c_dil[img_cell_c_dil == 2] = 1
+
+                img_edge = np.multiply(np.multiply(img_cell1_dil, img_cell_b_dil), img_cell_c_dil)
+
+                if len(pd.unique(img_edge.flatten())) < 2:
+                    continue
+
                 # orient cell counter clockwise
                 # need for lateral face analyses
                 a_ = csutils.get_angle(
@@ -205,20 +214,9 @@ class Segmentation:
                 if a_ > 0:
                     cc, cb = cb, cc
 
-                sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(cb)) + ".npz"))
-                img_cell_b_dil = sp_mat.todense()
-                img_cell_b_dil[img_cell_b_dil == 2] = 1
-
-                sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(cc)) + ".npz"))
-                img_cell_c_dil = sp_mat.todense()
-                img_cell_c_dil[img_cell_c_dil == 2] = 1
-
-                img_edge = np.multiply(np.multiply(img_cell1_dil, img_cell_b_dil), img_cell_c_dil)
-
-                if len(pd.unique(img_edge.flatten())) < 2:
-                    continue
-
-                z0, y0, x0 = np.where(img_edge > 0)
+                # z0, y0, x0 = np.where(img_edge > 0)
+                sparce_edge = sparse.COO.from_numpy(img_edge)
+                z0, y0, x0 = sparce_edge.coords
 
                 df = pd.DataFrame({"x": x0 * self.pixel_size['x_size'],
                                    "y": y0 * self.pixel_size['y_size'],
@@ -291,7 +289,6 @@ class Segmentation:
 
         for c_id in self.unique_id_cells:
 
-
             # open file
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
@@ -299,43 +296,90 @@ class Segmentation:
 
             sub_edges = edge_df[edge_df['id_im_1'] == c_id]
 
-            # cyclic path
-            graph, ordered_neighbours, opp_cell = find_ordered_neighbours(sub_edges)
+            ordered_neighbours, opp_cell = find_all_neighbours(sub_edges)
+
             if len(ordered_neighbours) != 0:
 
                 for c_op_index in opp_cell.keys():
                     c_op, a, b, c, d = opp_cell[c_op_index]
+
                     sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(c_op)) + ".npz"))
                     img_cell_dil2 = sp_mat.todense()
                     img_cell_dil2[img_cell_dil2 == 2] = 1
                     img_face = np.multiply(img_cell_dil, img_cell_dil2)
-                    z0, y0, x0 = np.where(img_face > 0)
 
-                    c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
-                    c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
-                    e1 = pd.DataFrame.from_dict({
-                        'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                           (edge_pixel_df['id_im_2'] == a) &
-                                           (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
-                        'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                           (edge_pixel_df['id_im_2'] == a) &
-                                           (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
-                        'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                           (edge_pixel_df['id_im_2'] == a) &
-                                           (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
-                    })
+                    sparce_face = sparse.COO.from_numpy(img_face)
+                    z0, y0, x0 = sparce_face.coords
 
-                    e2 = pd.DataFrame.from_dict({
-                        'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                            (edge_pixel_df['id_im_2'] == c) &
-                                            (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
-                        'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                            (edge_pixel_df['id_im_2'] == c) &
-                                            (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
-                        'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                           (edge_pixel_df['id_im_2'] == c) &
-                                           (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
-                    })
+
+                    if a is None:
+                        a = np.nan
+                        b = np.nan
+                        c1 = np.nan
+                        e1 = pd.DataFrame.from_dict({'x': [np.nan],
+                                                     'y': [np.nan],
+                                                     'z': [np.nan]})
+                        c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
+                        e2 = pd.DataFrame.from_dict({
+                            'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                                (edge_pixel_df['id_im_2'] == c) &
+                                                (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
+                            'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                                (edge_pixel_df['id_im_2'] == c) &
+                                                (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
+                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == c) &
+                                               (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
+                        })
+
+
+                    elif d is None:
+                        c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
+                        e1 = pd.DataFrame.from_dict({
+                            'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
+                            'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
+                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
+                        })
+                        c = np.nan
+                        d = np.nan
+                        c2 = np.nan
+                        e2 = pd.DataFrame.from_dict({'x1': [np.nan],
+                                                     'y1': [np.nan],
+                                                     'z': [np.nan]})
+
+                    else:
+
+                        c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
+                        c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
+                        e1 = pd.DataFrame.from_dict({
+                            'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
+                            'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
+                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == a) &
+                                               (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
+                        })
+
+                        e2 = pd.DataFrame.from_dict({
+                            'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                                (edge_pixel_df['id_im_2'] == c) &
+                                                (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
+                            'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                                (edge_pixel_df['id_im_2'] == c) &
+                                                (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
+                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                               (edge_pixel_df['id_im_2'] == c) &
+                                               (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
+                        })
 
                     e1_mean = e1.groupby('z').mean()
                     e2_mean = e2.groupby('z').mean()
@@ -377,134 +421,23 @@ class Segmentation:
                                                     orient="index").T
 
                     face_df = pd.concat([face_df, f_info], ignore_index=True)
-
-            # no cyclic path
-            graph, paths = find_paths(sub_edges)
-            if len(paths) != 0:
-                for path_ in paths:
-                    for i in range(len(path_)):
-                        c_op = path_[i]
-                        if len(face_df[(face_df['id_im_1'] == c_id) & (face_df['id_im_2'] == c_op)]) == 0:
-                            sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(c_op)) + ".npz"))
-                            img_cell_dil2 = sp_mat.todense()
-
-                            img_cell_dil2[img_cell_dil2 == 2] = 1
-                            img_face = np.multiply(img_cell_dil, img_cell_dil2)
-                            z0, y0, x0 = np.where(img_face > 0)
-
-                            find_edge_1 = True
-                            find_edge_2 = True
-                            if i == 0:
-                                find_edge_1 = False
-                            if i == len(path_) - 1:
-                                find_edge_2 = False
-
-                            if find_edge_1:
-                                a = path_[i - 1]
-                                b = path_[i]
-                                c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
-                                e1 = pd.DataFrame.from_dict({
-                                    'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                       (edge_pixel_df['id_im_2'] == a) &
-                                                       (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
-                                    'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                       (edge_pixel_df['id_im_2'] == a) &
-                                                       (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
-                                    'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                       (edge_pixel_df['id_im_2'] == a) &
-                                                       (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
-                                })
-                                e1_mean = e1.groupby('z').mean()
-                            else:
-                                a = np.nan
-                                b = np.nan
-                                c1 = np.nan
-                                e1 = pd.DataFrame.from_dict({'x': [np.nan],
-                                                             'y': [np.nan],
-                                                             'z': [np.nan]})
-                                e1_mean = e1.groupby('z').mean()
-
-                            if find_edge_2:
-                                c = path_[i]
-                                d = path_[i + 1]
-
-                                c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
-
-                                e2 = pd.DataFrame.from_dict({
-                                    'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                        (edge_pixel_df['id_im_2'] == c) &
-                                                        (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
-                                    'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                        (edge_pixel_df['id_im_2'] == c) &
-                                                        (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
-                                    'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                       (edge_pixel_df['id_im_2'] == c) &
-                                                       (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
-                                })
-                                e2_mean = e2.groupby('z').mean()
-                            else:
-                                c = np.nan
-                                d = np.nan
-                                c2 = np.nan
-                                e2 = np.nan
-                                e2 = pd.DataFrame.from_dict({'x1': [np.nan],
-                                                             'y2': [np.nan],
-                                                             'z': [np.nan]})
-
-                            #             if e1_mean is np.nan:
-                            #                 df = e2_mean
-                            #                 df['x'] = np.repeat(np.nan, df.shape[0])
-                            #                 df['y'] = np.repeat(np.nan, df.shape[0])
-                            #             else:
-                            df = (pd.concat((e1_mean, e2_mean), axis=1)).dropna()
-                            df['x_mid'] = (df['x'] + df["x1"]) / 2
-                            df['y_mid'] = (df['y'] + df["y1"]) / 2
-                            df['length_um'] = np.sqrt((df['x'] - df['x1']) ** 2.0 + (df['y'] - df['y1']) ** 2.0) * \
-                                              self.pixel_size[
-                                                  'x_size']
-                            df['angle'] = (np.arctan2((df['y1'] - df['y_mid']).to_numpy(),
-                                                      (df['x1'] - df['x_mid']).to_numpy()) * 180 / np.pi)
-
-                            f_pixel = pd.DataFrame(np.array([np.repeat(c_id, len(np.array(x0))),
-                                                             np.repeat(c_op, len(np.array(x0))),
-                                                             np.repeat(c1, len(np.array(x0))),
-                                                             np.repeat(c2, len(np.array(x0))),
-                                                             np.array(x0),
-                                                             np.array(y0),
-                                                             np.array(z0),
-                                                             ]).T,
-                                                   columns=face_columns)
-
-                            face_pixel_df = pd.concat([face_pixel_df, f_pixel], ignore_index=True)
-
-                            tmp = {"id_im_1": c_id,
-                                   "id_im_2": c_op,
-                                   "edge_1": c1,
-                                   "edge_2": c2,
-                                   "x_e1_mean": e1_mean['x'].to_numpy(),
-                                   "y_e1_mean": e1_mean['y'].to_numpy(),
-                                   "z_e1_mean": e1_mean.index.to_numpy(),
-                                   "x_e2_mean": e2_mean['x1'].to_numpy(),
-                                   "y_e2_mean": e2_mean['y1'].to_numpy(),
-                                   "z_e2_mean": e2_mean.index.to_numpy(),
-                                   "x_mid": df['x_mid'].to_numpy(),
-                                   "y_mid": df['y_mid'].to_numpy(),
-                                   "z_mid": df.index.to_numpy(),
-                                   "lengths": df['length_um'].to_numpy(),
-                                   "angles": df['angle'].to_numpy()
-                                   }
-
-                            f_info = pd.DataFrame.from_dict(tmp,
-                                                            orient="index").T
-
-                            face_df = pd.concat([face_df, f_info], ignore_index=True)
-
+        face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
         face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
         face_pixel_df.to_csv(os.path.join(self.storage_path, "face_pixel_df.csv"))
 
 
+def find_all_neighbours(sub_edges):
+    graph, ordered_neighbours1, opp_cell1 = find_cyclic_paths(sub_edges)
+    graph, ordered_neighbours2, opp_cell2 = find_non_cyclic_paths(sub_edges)
 
-def find_ordered_neighbours(sub_edges):
+    k_max = len(opp_cell1.keys())
+    for k, v in opp_cell2.items():
+        opp_cell1[k + k_max] = v
+
+    ordered_neighbours = ordered_neighbours1+ordered_neighbours2
+    return ordered_neighbours, opp_cell1
+
+def find_cyclic_paths(sub_edges):
     """
     Find all cyclic path in neighbours
     Parameters
@@ -523,8 +456,8 @@ def find_ordered_neighbours(sub_edges):
     G.add_nodes_from(np.unique(sub_edges[['id_im_2', 'id_im_3']].to_numpy()))
     # Add a list of edges:
     G.add_edges_from(sub_edges[['id_im_2', 'id_im_3']].to_numpy())
-    sorted_edges = sorted(nx.simple_cycles(G))
 
+    sorted_edges = sorted(nx.simple_cycles(G))
     ordered_neighbours = []
     for i in range(len(sorted_edges)):
         ordered_neighbours.append(np.array([sorted_edges[i],
@@ -542,7 +475,7 @@ def find_ordered_neighbours(sub_edges):
     return G, ordered_neighbours, opp_cell
 
 
-def find_paths(sub_edges):
+def find_non_cyclic_paths(sub_edges):
     """
     Find all non cyclic path in neighbours
     Parameters
@@ -568,11 +501,20 @@ def find_paths(sub_edges):
             roots.append(node)
         elif G.out_degree(node) == 0:  # it's a leaf
             leaves.append(node)
-    paths = []
+
+    ordered_neighbours = []
+    opp_cell = {}
+    cpt = 0
     for root in roots:
         for leaf in leaves:
             for path in nx.all_simple_paths(G, root, leaf):
-                paths.append(path)
+                ordered_neighbours.append(np.array(path))
+                path.insert(0, None)
+                path.append(None)
+                for i in range(1,len(path)-1):
+                    opp_cell[cpt] = (path[i], path[i-1], path[i], path[i], path[i+1])
+                    cpt += 1
 
-    return G, paths
+
+    return G, ordered_neighbours, opp_cell
 

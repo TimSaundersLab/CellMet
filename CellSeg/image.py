@@ -1,3 +1,5 @@
+import sparse
+
 import pandas as pd
 import numpy as np
 
@@ -69,7 +71,9 @@ def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     result (pd.DataFrame): position of the maximum distance for each z plane
     """
     if resize_image:
-        zz, yy, xx = np.where(img_cell == 1)
+        # zz, yy, xx = np.where(img_cell == 1)
+        sparce_cell = sparse.COO.from_numpy(img_cell)
+        zz, yy, xx = sparce_cell.coords
         xx_min = max(xx.min() - 1, 0)
         yy_min = max(yy.min() - 1, 0)
         zz_min = max(zz.min() - 1, 0)
