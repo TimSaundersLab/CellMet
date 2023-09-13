@@ -76,6 +76,11 @@ class Segmentation:
                                 meshtype=meshtype,
                                 path=os.path.join(self.storage_path, "obj_mesh"))
 
+    def all_segmentation(self):
+        self.cell_segmentation()
+        self.edge_segmentation()
+        self.face_segmentation()
+
     def cell_segmentation(self):
         """
         Analyse cell parameter such as volume, length, number of neighbor.
@@ -161,7 +166,7 @@ class Segmentation:
         edge_columns = ["id_im_1",
                         "id_im_2",
                         "id_im_3",
-                        "x_mean", "y_mean", "z_mean",
+                        "x_center", "y_center", "z_center",
                         ]
         edge_df = pd.DataFrame(columns=edge_columns)
 
@@ -243,14 +248,13 @@ class Segmentation:
                 edge_df.loc[len(edge_df)] = {"id_im_1": c_id,
                                              "id_im_2": cb,
                                              "id_im_3": cc,
-                                             "x_mean": x0.mean(),
-                                             "y_mean": y0.mean(),
-                                             "z_mean": z0.mean(),
+                                             "x_center": x0.mean(),
+                                             "y_center": y0.mean(),
+                                             "z_center": z0.mean(),
                                              }
 
         edge_df.to_csv(os.path.join(self.storage_path, "edge_df.csv"))
         edge_pixel_df.to_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
-
 
     def face_segmentation(self):
         """
@@ -267,10 +271,13 @@ class Segmentation:
         face_pixel_df = pd.DataFrame(columns=face_columns)
         face_df = pd.DataFrame(columns=["id_im_1", "id_im_2",
                                         "edge_1", "edge_2",
-                                        "x_e1_mean", "y_e1_mean", "z_e1_mean",
-                                        "x_e2_mean", "y_e2_mean", "z_e2_mean",
-                                        "x_mid", "y_mid", "z_mid",
                                         ], )
+
+        face_edge_pixel_df = pd.DataFrame(columns=["id_im_1", "id_im_2",
+                                                   "edge_1", "edge_2",
+                                                   "x_e1_mean", "y_e1_mean", "z_e1_mean",
+                                                   "x_e2_mean", "y_e2_mean", "z_e2_mean",
+                                                   "x_mid", "y_mid", "z_mid", ])
 
         for c_id in self.unique_id_cells:
 
@@ -388,6 +395,17 @@ class Segmentation:
                            "id_im_2": c_op,
                            "edge_1": c1,
                            "edge_2": c2,
+                           }
+
+                    f_info = pd.DataFrame.from_dict(tmp,
+                                                    orient="index").T
+
+                    face_df = pd.concat([face_df, f_info], ignore_index=True)
+
+                    tmp = {"id_im_1": np.repeat(c_id, len(e1_mean['x'])),
+                           "id_im_2": np.repeat(c_op, len(e1_mean['x'])),
+                           "edge_1": np.repeat(c1, len(e1_mean['x'])),
+                           "edge_2": np.repeat(c2, len(e1_mean['x'])),
                            "x_e1_mean": e1_mean['x'].to_numpy(),
                            "y_e1_mean": e1_mean['y'].to_numpy(),
                            "z_e1_mean": e1_mean.index.to_numpy(),
@@ -397,16 +415,17 @@ class Segmentation:
                            "x_mid": df['x_mid'].to_numpy(),
                            "y_mid": df['y_mid'].to_numpy(),
                            "z_mid": df.index.to_numpy(),
-
                            }
 
                     f_info = pd.DataFrame.from_dict(tmp,
                                                     orient="index").T
 
-                    face_df = pd.concat([face_df, f_info], ignore_index=True)
+                    face_edge_pixel_df = pd.concat([face_edge_pixel_df, f_info], ignore_index=True)
+
         face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
         face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
         face_pixel_df.to_csv(os.path.join(self.storage_path, "face_pixel_df.csv"))
+        face_edge_pixel_df.to_csv(os.path.join(self.storage_path, "face_edge_pixel_df.csv"))
 
 
 def find_all_neighbours(sub_edges):

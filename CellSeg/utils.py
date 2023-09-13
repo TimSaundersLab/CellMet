@@ -58,3 +58,22 @@ def get_angle(a, b, c, degree_convert=True):
     if degree_convert:
         ang = ang / np.pi * 180
     return ang
+
+
+def str_to_array(string):
+    """
+    Convert string into array when read csv file.
+
+    Parameters
+    ----------
+    string (str): string of float value
+
+    Returns
+    -------
+    list (list): list of float values
+    """
+    return np.array([float(re.sub('[^.\-\d]', '', x))
+                     if 'e-' not in x
+                     else float(re.sub('[^.\-\d]', '', x.split('e-')[0]))*float(re.sub('[^.\-\d]', '', x.split('e-')[-1]))
+                     for x in np.array(str(string).split(" "))
+                     if ((x != "...") and (x != "") and (re.sub('[^.\-\d]', '', x) !=""))])
