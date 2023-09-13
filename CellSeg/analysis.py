@@ -17,6 +17,14 @@ def cell_analysis():
 
 def edge_analysis():
     # Calculate edge lengths and curvature
+    z0, y0, x0 = sparce_edge.coords
+
+    df = pd.DataFrame({"x": x0 * self.pixel_size['x_size'],
+                       "y": y0 * self.pixel_size['y_size'],
+                       "z": z0 * self.pixel_size['z_size'], })
+
+    df = df.groupby('z').mean()
+    df.reset_index(drop=False, inplace=True)
     real_dist, short_dist, curv_ind = ZManalysis.calculate_lengths_curvature(df,
                                                                              columns=['x', 'y', "z"])
 

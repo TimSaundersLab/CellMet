@@ -12,7 +12,7 @@ from vtk import (vtkPolyData,
 from tifffile import tifffile
 from skimage import measure
 
-from image import get_label, get_unique_id_in_image
+from . import image as csimage
 
 
 def ndarray2vtkMesh(inVertexArray, inFacesArray):
@@ -67,7 +67,7 @@ def _getLargestCC(segmentation):
 def label2vtk(segmentation, label, step_size=1):
     """Compute a mesh from a single object"""
     # Retrieve the segmentation corresponding to the label, keep it if > min_volume
-    obj = get_label(segmentation, label)
+    obj = csimage.get_label(segmentation, label)
 
     if obj is None:
         return None
@@ -106,7 +106,7 @@ def make_mesh_file(image, id_unique_cell=None, meshtype="ply", step_size=1, path
 
     """
     if id_unique_cell is None:
-        id_unique_cell = get_unique_id_in_image(image)
+        id_unique_cell = csimage.get_unique_id_in_image(image)
 
     for i in id_unique_cell:
         vtkPoly = label2vtk(image, i, step_size)

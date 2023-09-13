@@ -9,6 +9,7 @@ from scipy import ndimage as ndi
 
 from . import utils as csutils
 from . import image as csimage
+from . import io as csio
 
 
 class Segmentation:
@@ -29,7 +30,7 @@ class Segmentation:
         self.unique_id_cells = csimage.get_unique_id_in_image(image)
         self.storage_path = path
 
-    def perform_prerequisite(self, overright=False, save_mesh=False):
+    def perform_prerequisite(self, overright=False, save_mesh=False, meshtype="ply"):
         """
         Perform prerequisite that is required for further analysis.
         This fonction :
@@ -68,14 +69,12 @@ class Segmentation:
             sp_mat = sparse.COO.from_numpy(img_comb)
             sparse.save_npz(os.path.join(self.storage_path + "npz", str(c_id) + ".npz"), sp_mat)
 
-            # # Perform 3D distance map
-            # result = ZManalysis.find_cell_axis_center(img_cell, pixel_size)
-            # result.to_csv(os.path.join(self.storage_path + "Center_fibre_coords", str(c_id) + ".csv"))
-
-            # save mesh file
-            if save_mesh:
-                print("This is not implemented yet")
-                # ZMimage.make_obj(img_cell, c_id, path+"obj_mesh")
+        # save mesh file
+        if save_mesh:
+            csio.make_mesh_file(self.label_image,
+                                self.unique_id_cells,
+                                meshtype=meshtype,
+                                path=os.path.join(self.storage_path, "obj_mesh"))
 
     def cell_segmentation(self):
         """
@@ -91,7 +90,6 @@ class Segmentation:
         """
 
         cell_columns = ["id_im",
-                        "vol(um3)",
                         "x_center",
                         "y_center",
                         "z_center",
@@ -107,7 +105,7 @@ class Segmentation:
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
         for c_id in self.unique_id_cells:
-            # open files generate by prerequisite
+            # open image
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
             img_cell = csimage.get_label(img_cell_dil, 1).astype("uint8")
@@ -117,20 +115,18 @@ class Segmentation:
 
             # measure nb neighbours
             neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
-            # neighbours_id = np.delete(neighbours_id, np.where(neighbours_id == c_id))
 
             # Get center of the cell
-            # z, y, x = np.array(np.where(img_cell > 0)).mean(axis=1)
             sparce_cell = sparse.COO.from_numpy(img_cell)
             z, y, x = sparce_cell.coords.mean(axis=1)
 
-            c_info = pd.DataFrame.from_dict({"id_im": c_id,
-                                             "x_center": x,
-                                             "y_center": y,
-                                             "z_center": z,
-                                             "nb_neighbor": len(neighbours_id)-1,
-                                             },
-                                            orient="index").T
+            # Populate cell dataframe
+            cell_df.loc[len(cell_df)] = {"id_im": c_id,
+                                         "x_center": x,
+                                         "y_center": y,
+                                         "z_center": z,
+                                         "nb_neighbor": len(neighbours_id) - 1,
+                                         }
 
             c_p_info = pd.DataFrame(np.array([np.repeat(c_id, len(data_["x_center"].to_numpy())),
                                               data_["x_center"].to_numpy(),
@@ -139,20 +135,19 @@ class Segmentation:
                                               ]).T,
                                     columns=cell_plane_columns)
 
-            cell_df = pd.concat([cell_df, c_info], ignore_index=True)
             cell_plane_df = pd.concat([cell_plane_df, c_p_info], ignore_index=True)
 
+        # Save dataframe
         cell_df.to_csv(os.path.join(self.storage_path, "cell_df.csv"))
         cell_plane_df.to_csv(os.path.join(self.storage_path, "cell_plane_df.csv"))
-        return cell_df, cell_plane_df
 
     def edge_segmentation(self):
         """
 
-        :param cell_df:
-        :param cell_plane_df:
         :return:
         """
+
+        # Open cell dataframe
         cell_df = pd.read_csv(os.path.join(self.storage_path, "cell_df.csv"))
         cell_plane_df = pd.read_csv(os.path.join(self.storage_path, "cell_plane_df.csv"))
 
@@ -175,7 +170,6 @@ class Segmentation:
             # step 1
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell1_dil = sp_mat.todense()
-            sp_mat = None
 
             img_cell1_dil[img_cell1_dil == 2] = 1
 
@@ -214,23 +208,15 @@ class Segmentation:
                 if a_ > 0:
                     cc, cb = cb, cc
 
-                # z0, y0, x0 = np.where(img_edge > 0)
                 sparce_edge = sparse.COO.from_numpy(img_edge)
                 z0, y0, x0 = sparce_edge.coords
 
-                df = pd.DataFrame({"x": x0 * self.pixel_size['x_size'],
-                                   "y": y0 * self.pixel_size['y_size'],
-                                   "z": z0 * self.pixel_size['z_size'], })
-
-                df = df.groupby('z').mean()
-                df.reset_index(drop=False, inplace=True)
-
                 # relative position to the center of cell
-                cell_pos = pd.DataFrame.from_dict({'x': np.round(
-                    (cell_plane_df[cell_plane_df['id_im'] == c_id]['x_center'].to_numpy()).astype(float)),
-                    'y': np.round((cell_plane_df[cell_plane_df['id_im'] == c_id]['y_center'].to_numpy()).astype(
-                        float)),
-                    'z': cell_plane_df[cell_plane_df['id_im'] == c_id]['z_center'].to_numpy()})
+                cell_pos = pd.DataFrame.from_dict({
+                    'x': np.round((cell_plane_df[cell_plane_df['id_im'] == c_id]['x_center'].to_numpy()).astype(float)),
+                    'y': np.round((cell_plane_df[cell_plane_df['id_im'] == c_id]['y_center'].to_numpy()).astype(float)),
+                    'z': cell_plane_df[cell_plane_df['id_im'] == c_id]['z_center'].to_numpy()
+                })
 
                 x_cell = []
                 y_cell = []
@@ -250,28 +236,27 @@ class Segmentation:
                                                  np.array(z0),
                                                  np.array(x_cell),
                                                  np.array(y_cell),
-                                                 np.array(z_cell), ]).T,
+                                                 np.array(z_cell)]).T,
                                        columns=edge_pixel_columns)
                 edge_pixel_df = pd.concat([edge_pixel_df, e_pixel], ignore_index=True)
 
-                tmp = {"id_im_1": c_id,
-                       "id_im_2": cb,
-                       "id_im_3": cc,
-                       "x_mean": x0.mean(),
-                       "y_mean": y0.mean(),
-                       "z_mean": z0.mean(),
-                       }
-
-                c_info = pd.DataFrame.from_dict(tmp,
-                                                orient="index").T
-
-                edge_df = pd.concat([edge_df, c_info], ignore_index=True)
+                edge_df.loc[len(edge_df)] = {"id_im_1": c_id,
+                                             "id_im_2": cb,
+                                             "id_im_3": cc,
+                                             "x_mean": x0.mean(),
+                                             "y_mean": y0.mean(),
+                                             "z_mean": z0.mean(),
+                                             }
 
         edge_df.to_csv(os.path.join(self.storage_path, "edge_df.csv"))
         edge_pixel_df.to_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
-        return edge_df, edge_pixel_df
+
 
     def face_segmentation(self):
+        """
+
+        :return:
+        """
         edge_df = pd.read_csv(os.path.join(self.storage_path, "edge_df.csv"))
         edge_pixel_df = pd.read_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
 
@@ -285,7 +270,7 @@ class Segmentation:
                                         "x_e1_mean", "y_e1_mean", "z_e1_mean",
                                         "x_e2_mean", "y_e2_mean", "z_e2_mean",
                                         "x_mid", "y_mid", "z_mid",
-                                       ], )
+                                        ], )
 
         for c_id in self.unique_id_cells:
 
@@ -310,7 +295,6 @@ class Segmentation:
 
                     sparce_face = sparse.COO.from_numpy(img_face)
                     z0, y0, x0 = sparce_face.coords
-
 
                     if a is None:
                         a = np.nan
@@ -388,7 +372,6 @@ class Segmentation:
                     df['x_mid'] = (df['x'] + df["x1"]) / 2
                     df['y_mid'] = (df['y'] + df["y1"]) / 2
 
-
                     f_pixel = pd.DataFrame(np.array([np.repeat(c_id, len(np.array(x0))),
                                                      np.repeat(c_op, len(np.array(x0))),
                                                      np.repeat(c1, len(np.array(x0))),
@@ -434,8 +417,9 @@ def find_all_neighbours(sub_edges):
     for k, v in opp_cell2.items():
         opp_cell1[k + k_max] = v
 
-    ordered_neighbours = ordered_neighbours1+ordered_neighbours2
+    ordered_neighbours = ordered_neighbours1 + ordered_neighbours2
     return ordered_neighbours, opp_cell1
+
 
 def find_cyclic_paths(sub_edges):
     """
@@ -511,10 +495,8 @@ def find_non_cyclic_paths(sub_edges):
                 ordered_neighbours.append(np.array(path))
                 path.insert(0, None)
                 path.append(None)
-                for i in range(1,len(path)-1):
-                    opp_cell[cpt] = (path[i], path[i-1], path[i], path[i], path[i+1])
+                for i in range(1, len(path) - 1):
+                    opp_cell[cpt] = (path[i], path[i - 1], path[i], path[i], path[i + 1])
                     cpt += 1
 
-
     return G, ordered_neighbours, opp_cell
-
