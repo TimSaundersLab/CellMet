@@ -77,6 +77,8 @@ def cell_analysis(Segmentation):
     cell_plane_df["area"] = area
     cell_plane_df["perimeter"] = perimeter
 
+    calculate_cell_orientation(cell_df, cell_plane_df)
+
     cell_df.to_csv(os.path.join(Segmentation.storage_path, "cell_df.csv"))
     cell_plane_df.to_csv(os.path.join(Segmentation.storage_path, "cell_plane_df.csv"))
 
@@ -138,7 +140,6 @@ def edge_analysis(Segmentation):
 
 
 def face_analysis(Segmentation):
-
     face_edge_pixel_df = pd.read_csv(os.path.join(Segmentation.storage_path, "face_edge_pixel_df.csv"),
                                      index_col="Unnamed: 0")
 
@@ -155,6 +156,29 @@ def face_analysis(Segmentation):
                                                    'x_size']).to_numpy()) * 180 / np.pi)
 
     face_edge_pixel_df.to_csv(os.path.join(Segmentation.storage_path, "face_edge_pixel_df.csv"))
+
+
+def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
+    start = []
+    end = []
+    for i, val in cell_df.iterrows():
+        start.append(
+            cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[0])
+        end.append(
+            cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[-1])
+
+    cell_df[['x_start', 'y_start', 'z_start']] = start
+    cell_df[['x_end', 'y_end', 'z_end']] = end
+
+    convert = 1
+    if degree_convert:
+        convert = 180 / np.pi
+    cell_df['orient_zy'] = np.arctan2((cell_df["z_end"] - cell_df['z_start']).to_numpy(),
+                                   (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
+    cell_df['orient_xy'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
+                                      (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
+    cell_df['orient_xz'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
+                                      (cell_df["z_end"] - cell_df['z_start']).to_numpy()) * convert
 
 
 def calculate_lengths_curvature(data, columns):
