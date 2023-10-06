@@ -110,6 +110,7 @@ class Segmentation:
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
         for c_id in self.unique_id_cells:
+            c_id = int(c_id)
             # open image
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
@@ -126,13 +127,13 @@ class Segmentation:
             z, y, x = sparce_cell.coords.mean(axis=1)
 
             # Populate cell dataframe
-            cell_df.loc[len(cell_df)] = {"id_im": c_id,
+            cell_df.loc[len(cell_df)] = {"id_im": int(c_id),
                                          "x_center": x,
                                          "y_center": y,
                                          "z_center": z,
                                          "nb_neighbor": len(neighbours_id) - 1,
                                          }
-
+            cell_df.to_csv(os.path.join(self.storage_path, "cell_df.csv"))
             c_p_info = pd.DataFrame(np.array([np.repeat(c_id, len(data_["x_center"].to_numpy())),
                                               data_["x_center"].to_numpy(),
                                               data_["y_center"].to_numpy(),
@@ -245,9 +246,9 @@ class Segmentation:
                                        columns=edge_pixel_columns)
                 edge_pixel_df = pd.concat([edge_pixel_df, e_pixel], ignore_index=True)
 
-                edge_df.loc[len(edge_df)] = {"id_im_1": c_id,
-                                             "id_im_2": cb,
-                                             "id_im_3": cc,
+                edge_df.loc[len(edge_df)] = {"id_im_1": int(c_id),
+                                             "id_im_2": int(cb),
+                                             "id_im_3": int(cc),
                                              "x_center": x0.mean(),
                                              "y_center": y0.mean(),
                                              "z_center": z0.mean(),

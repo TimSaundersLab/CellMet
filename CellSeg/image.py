@@ -33,6 +33,7 @@ def get_unique_id_in_image(image, background_value=0):
     id_cells (list): list of all cell id in the image
     """
     id_cells = pd.unique(image.flatten())
+    id_cells.sort()
     id_cells = np.delete(id_cells, np.where(id_cells==background_value))
     return id_cells
 
