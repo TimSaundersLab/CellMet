@@ -81,6 +81,33 @@ class Segmentation:
         self.edge_segmentation()
         self.face_segmentation()
 
+    def cell_segmentation_simplified(self):
+        cell_columns = ["id_im",
+                        "nb_neighbor",
+                        "ids_neighbor"
+                        ]
+        cell_df = pd.DataFrame(columns=cell_columns)
+        for c_id in self.unique_id_cells:
+            c_id = int(c_id)
+            # open image
+            sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
+            img_cell_dil = sp_mat.todense()
+            img_cell = csimage.get_label(img_cell_dil, 1).astype("uint8")
+            img_cell_dil[img_cell_dil == 2] = 1
+
+            # measure nb neighbours
+            neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
+            neighbours_id = np.delete(neighbours_id, np.where(c_id == neighbours_id))
+            # Populate cell dataframe
+            cell_df.loc[len(cell_df)] = {"id_im": int(c_id),
+                                         "nb_neighbor": len(neighbours_id),
+                                         "ids_neighbor": "".join([str(n)+';' for n in neighbours_id])
+                                         }
+            cell_df.to_csv(os.path.join(self.storage_path, "cell_simple_df.csv"))
+
+        # Save dataframe
+        cell_df.to_csv(os.path.join(self.storage_path, "cell_simple_df.csv"))
+
     def cell_segmentation(self):
         """
         Analyse cell parameter such as volume, length, number of neighbor.
