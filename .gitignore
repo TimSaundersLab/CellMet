@@ -6,3 +6,5 @@ build/
 notebooks/.ipynb_checkpoints/
 
 CellSeg.egg-info/
+
+notebooks/*/*.png
