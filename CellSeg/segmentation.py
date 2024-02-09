@@ -282,27 +282,13 @@ class Segmentation:
                     z0, y0, x0 = sparce_face.coords
 
                     if a is None:
-                        a = np.nan
-                        b = np.nan
+                        # a = np.nan
+                        # b = np.nan
                         c1 = np.nan
                         e1 = pd.DataFrame.from_dict({'x': [np.nan],
                                                      'y': [np.nan],
                                                      'z': [np.nan]})
-                        c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
-                        e2 = pd.DataFrame.from_dict({
-                            'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                (edge_pixel_df['id_im_2'] == c) &
-                                                (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
-                            'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                (edge_pixel_df['id_im_2'] == c) &
-                                                (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
-                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == c) &
-                                               (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
-                        })
-
-
-                    elif d is None:
+                    else:
                         c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
                         e1 = pd.DataFrame.from_dict({
                             'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
@@ -315,29 +301,15 @@ class Segmentation:
                                                (edge_pixel_df['id_im_2'] == a) &
                                                (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
                         })
-                        c = np.nan
-                        d = np.nan
+                    if d is None:
+                        # c = np.nan
+                        # d = np.nan
                         c2 = np.nan
                         e2 = pd.DataFrame.from_dict({'x1': [np.nan],
                                                      'y1': [np.nan],
                                                      'z': [np.nan]})
-
                     else:
-
-                        c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
                         c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
-                        e1 = pd.DataFrame.from_dict({
-                            'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
-                            'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
-                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
-                        })
-
                         e2 = pd.DataFrame.from_dict({
                             'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
                                                 (edge_pixel_df['id_im_2'] == c) &
