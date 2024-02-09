@@ -15,31 +15,38 @@ from . import io as csio
 
 class Segmentation:
 
-    def __init__(self):
-        self.label_image = np.array()
-        self.pixel_size = dict(x_size=1, y_size=1, z_size=1)
-        self.voxel_size = np.prod(list(self.pixel_size.values()))
-        self.struct_dil = None
-        self.unique_id_cells = np.array()
-        self.storage_path = ""
+    def __init__(self, image=None, pixel_size=None, path=None):
+        """Segmentation class constructor
+        """
 
-    def __init__(self, image, pixel_size, path):
-        self.label_image = image
-        self.pixel_size = pixel_size
+        if image is not None:
+            self.label_image = image
+            self.unique_id_cells = csimage.get_unique_id_in_image(image)
+        else:
+            self.label_image = np.empty(0)
+            self.unique_id_cells = np.empty(0)
+
+        if pixel_size is not None:
+            self.pixel_size = pixel_size
+        else:
+            self.pixel_size = dict(x_size=1, y_size=1, z_size=1)
         self.voxel_size = np.prod(list(self.pixel_size.values()))
         self.struct_dil = csutils.generate_struct_dil()
-        self.unique_id_cells = csimage.get_unique_id_in_image(image)
-        self.storage_path = path
 
-    def perform_prerequisite(self, overright=False, save_mesh=False, meshtype="ply"):
+        if path is not None:
+            self.storage_path = path
+        else:
+            self.storage_path = ""
+
+    def perform_prerequisite(self, overwrite=False, save_mesh=False, meshtype="ply"):
         """
         Perform prerequisite that is required for further analysis.
-        This fonction :
+        This function :
             - find the center of each cell (in z(depth) axis)
             - save one sparse matrix per cell that contains its pixel and dilated
         Parameters
         ----------
-        overright (bool): default False, allow to over right if directory "Center_fibre_coord" is not empty
+        overwrite (bool): default False, allow to over right if directory "Center_fibre_coord" is not empty
         save_obj (bool): default False, choose to save mesh file
 
         Returns
@@ -56,8 +63,8 @@ class Segmentation:
 
             list_dir = os.listdir(self.storage_path + d)
             if len(list_dir) > 0:
-                if not overright:
-                    print("This folder " + d + " is not empty, \nIf you want to save file here, turn overright to True")
+                if not overwrite:
+                    print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
                     return
 
         for c_id in self.unique_id_cells:
@@ -93,7 +100,6 @@ class Segmentation:
             # open image
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
-            img_cell = csimage.get_label(img_cell_dil, 1).astype("uint8")
             img_cell_dil[img_cell_dil == 2] = 1
 
             # measure nb neighbours
@@ -119,7 +125,7 @@ class Segmentation:
         Returns
         -------
         cell_df (pd.DataFrame): result for each cells
-        cell_plane_df (pd.DataFrame): result for each plane of each cells
+        cell_plane_df (pd.DataFrame): result for each plane of each cell
         """
 
         cell_columns = ["id_im",
@@ -214,10 +220,11 @@ class Segmentation:
             cell_combi = csutils.make_all_list_combination(np.delete(neighbours_id, np.where(c_id == neighbours_id)),
                                                            2)
 
-
-            delayed_call = [joblib.delayed(edge_detection)(self, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil, cb, cc)
-                            for cb, cc in cell_combi]
-            res = joblib.Parallel(n_jobs=os.cpu_count()-2)(delayed_call)
+            delayed_call = [
+                joblib.delayed(edge_detection)(self, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil,
+                                               cb, cc)
+                for cb, cc in cell_combi]
+            res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
             res = [(e_pixel, e_dict) for e_pixel, e_dict in res if e_pixel is not None]
             for e_pixel, e_dict in res:
                 edge_pixel_df = pd.concat([df for df in [edge_pixel_df, e_pixel] if not df.empty],
@@ -431,13 +438,13 @@ def find_cyclic_paths(sub_edges):
     opp_cell (dict):
     """
     # Create Directed Graph
-    G = nx.DiGraph()
+    d_graph = nx.DiGraph()
     # Add a list of nodes:
-    G.add_nodes_from(np.unique(sub_edges[['id_im_2', 'id_im_3']].to_numpy()))
+    d_graph.add_nodes_from(np.unique(sub_edges[['id_im_2', 'id_im_3']].to_numpy()))
     # Add a list of edges:
-    G.add_edges_from(sub_edges[['id_im_2', 'id_im_3']].to_numpy())
+    d_graph.add_edges_from(sub_edges[['id_im_2', 'id_im_3']].to_numpy())
 
-    sorted_edges = sorted(nx.simple_cycles(G))
+    sorted_edges = sorted(nx.simple_cycles(d_graph))
     ordered_neighbours = []
     for i in range(len(sorted_edges)):
         ordered_neighbours.append(np.array([sorted_edges[i],
@@ -452,12 +459,12 @@ def find_cyclic_paths(sub_edges):
                 opp_cell[cpt] = (tuple(np.concatenate([[start[1]], start, end])))
                 cpt += 1
 
-    return G, ordered_neighbours, opp_cell
+    return d_graph, ordered_neighbours, opp_cell
 
 
 def find_non_cyclic_paths(sub_edges):
     """
-    Find all non cyclic path in neighbours
+    Find all non-cyclic path in neighbours
     Parameters
     ----------
     sub_edges (pd.DataFrame):
@@ -467,19 +474,19 @@ def find_non_cyclic_paths(sub_edges):
 
     """
     # Create Directed Graph
-    G = nx.DiGraph()
+    d_graph = nx.DiGraph()
     # Add a list of nodes:
-    G.add_nodes_from(np.unique(sub_edges[['id_im_2', 'id_im_3']].to_numpy()))
+    d_graph.add_nodes_from(np.unique(sub_edges[['id_im_2', 'id_im_3']].to_numpy()))
     # Add a list of edges:
-    G.add_edges_from(sub_edges[['id_im_2', 'id_im_3']].to_numpy())
+    d_graph.add_edges_from(sub_edges[['id_im_2', 'id_im_3']].to_numpy())
 
     # Find all paths
     roots = []
     leaves = []
-    for node in G.nodes:
-        if G.in_degree(node) == 0:  # it's a root
+    for node in d_graph.nodes:
+        if d_graph.in_degree(node) == 0:  # it's a root
             roots.append(node)
-        elif G.out_degree(node) == 0:  # it's a leaf
+        elif d_graph.out_degree(node) == 0:  # it's a leaf
             leaves.append(node)
 
     ordered_neighbours = []
@@ -487,7 +494,7 @@ def find_non_cyclic_paths(sub_edges):
     cpt = 0
     for root in roots:
         for leaf in leaves:
-            for path in nx.all_simple_paths(G, root, leaf):
+            for path in nx.all_simple_paths(d_graph, root, leaf):
                 ordered_neighbours.append(np.array(path))
                 path.insert(0, None)
                 path.append(None)
@@ -495,10 +502,10 @@ def find_non_cyclic_paths(sub_edges):
                     opp_cell[cpt] = (path[i], path[i - 1], path[i], path[i], path[i + 1])
                     cpt += 1
 
-    return G, ordered_neighbours, opp_cell
+    return d_graph, ordered_neighbours, opp_cell
 
 
-def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns,  c_id, img_cell1_dil, cb, cc):
+def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil, cb, cc):
     sp_mat = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(int(cb)) + ".npz"))
     img_cell_b_dil = sp_mat.todense()
     img_cell_b_dil[img_cell_b_dil == 2] = 1
@@ -511,7 +518,7 @@ def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns,  c_id, img_c
 
     if len(pd.unique(img_edge.flatten())) < 2:
         return None, None
-    # orient cell counter clockwise
+    # orient cell counterclockwise
     # need for lateral face analyses
     a_ = csutils.get_angle(
         (cell_df[cell_df['id_im'] == cb]['x_center'].to_numpy()[0] * seg.pixel_size['x_size'],
@@ -557,10 +564,10 @@ def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns,  c_id, img_c
                                      np.array(z_cell)]).T,
                            columns=edge_pixel_columns)
     e_dict = {"id_im_1": int(c_id),
-                     "id_im_2": int(cb),
-                     "id_im_3": int(cc),
-                     "x_center": x0.mean(),
-                     "y_center": y0.mean(),
-                     "z_center": z0.mean(),
-                     }
+              "id_im_2": int(cb),
+              "id_im_3": int(cc),
+              "x_center": x0.mean(),
+              "y_center": y0.mean(),
+              "z_center": z0.mean(),
+              }
     return e_pixel, e_dict

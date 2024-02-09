@@ -11,24 +11,24 @@ from . import utils as csutils
 from . import image as csimage
 
 
-def cell_analysis(Segmentation):
+def cell_analysis(seg: Segmentation):
     """
 
-    :param Segmentation:
+    :param seg : Segmentation object
     :return:
     """
 
     # Open cell_df
-    cell_df = pd.read_csv(os.path.join(Segmentation.storage_path, "cell_df.csv"),
+    cell_df = pd.read_csv(os.path.join(seg.storage_path, "cell_df.csv"),
                           index_col="Unnamed: 0")
-    cell_plane_df = pd.read_csv(os.path.join(Segmentation.storage_path, "cell_plane_df.csv"),
+    cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
                                 index_col="Unnamed: 0")
 
     # Calculate volume
     volume = []
     for c_id in cell_df['id_im']:
-        sparse_cell = sparse.load_npz(os.path.join(Segmentation.storage_path, "npz/" + str(c_id) + ".npz"))
-        volume.append(len(sparse_cell.coords[0]) * Segmentation.voxel_size)
+        sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+        volume.append(len(sparse_cell.coords[0]) * seg.voxel_size)
     cell_df["volume"] = volume
 
     # Calculate cell lengths and curvature
@@ -37,9 +37,9 @@ def cell_analysis(Segmentation):
     curv_ind = []
     for c_id in cell_df['id_im']:
         df_ = cell_plane_df[cell_plane_df['id_im'] == c_id].copy()
-        df_['x_center'] *= Segmentation.pixel_size["x_size"]
-        df_['y_center'] *= Segmentation.pixel_size["y_size"]
-        df_['z_center'] *= Segmentation.pixel_size["z_size"]
+        df_['x_center'] *= seg.pixel_size["x_size"]
+        df_['y_center'] *= seg.pixel_size["y_size"]
+        df_['z_center'] *= seg.pixel_size["z_size"]
         rd, sd, ci = calculate_lengths_curvature(df_, columns=["x_center", "y_center", "z_center"])
         real_dist.append(rd)
         short_dist.append(sd)
@@ -57,11 +57,11 @@ def cell_analysis(Segmentation):
     area = []
     perimeter = []
     for c_id in cell_df['id_im']:
-        sparse_cell = sparse.load_npz(os.path.join(Segmentation.storage_path, "npz/" + str(c_id) + ".npz"))
+        sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
         img_cell = sparse_cell.todense()
         img_cell = csimage.get_label(img_cell, 1).astype("uint8")
 
-        (a, ox, oy, maj, mi, ar, per) = measure_cell_plane(img_cell, Segmentation.pixel_size)
+        (a, ox, oy, maj, mi, ar, per) = measure_cell_plane(img_cell, seg.pixel_size)
         aniso.extend(a)
         orientation_x.extend(ox)
         orientation_y.extend(oy)
@@ -79,20 +79,20 @@ def cell_analysis(Segmentation):
 
     calculate_cell_orientation(cell_df, cell_plane_df)
 
-    cell_df.to_csv(os.path.join(Segmentation.storage_path, "cell_df.csv"))
-    cell_plane_df.to_csv(os.path.join(Segmentation.storage_path, "cell_plane_df.csv"))
+    cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
+    cell_plane_df.to_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"))
 
 
-def edge_analysis(Segmentation):
+def edge_analysis(seg: Segmentation):
     """
 
-    :param Segmentation:
+    :param seg : Segmentation object
     :return:
     """
 
-    edge_df = pd.read_csv(os.path.join(Segmentation.storage_path, "edge_df.csv"),
+    edge_df = pd.read_csv(os.path.join(seg.storage_path, "edge_df.csv"),
                           index_col="Unnamed: 0")
-    edge_pixel_df = pd.read_csv(os.path.join(Segmentation.storage_path, "edge_pixel_df.csv"),
+    edge_pixel_df = pd.read_csv(os.path.join(seg.storage_path, "edge_pixel_df.csv"),
                                 index_col="Unnamed: 0")
 
     # Calculate edge lengths and curvature
@@ -103,9 +103,9 @@ def edge_analysis(Segmentation):
         df_ = edge_pixel_df[(edge_pixel_df['id_im_1'] == c1) &
                             (edge_pixel_df['id_im_2'] == c2) &
                             (edge_pixel_df['id_im_3'] == c3)].copy()
-        df_['x'] *= Segmentation.pixel_size["x_size"]
-        df_['y'] *= Segmentation.pixel_size["y_size"]
-        df_['z'] *= Segmentation.pixel_size["z_size"]
+        df_['x'] *= seg.pixel_size["x_size"]
+        df_['y'] *= seg.pixel_size["y_size"]
+        df_['z'] *= seg.pixel_size["z_size"]
         df_ = df_.groupby('z').mean()
         df_.reset_index(drop=False, inplace=True)
         rd, sd, ci = calculate_lengths_curvature(df_, columns=list("xyz"))
@@ -122,9 +122,9 @@ def edge_analysis(Segmentation):
         df_ = edge_pixel_df[(edge_pixel_df['id_im_1'] == c1) &
                             (edge_pixel_df['id_im_2'] == c2) &
                             (edge_pixel_df['id_im_3'] == c3)].copy()
-        df_['x_cell'] *= Segmentation.pixel_size["x_size"]
-        df_['y_cell'] *= Segmentation.pixel_size["y_size"]
-        df_['z_cell'] *= Segmentation.pixel_size["z_size"]
+        df_['x_cell'] *= seg.pixel_size["x_size"]
+        df_['y_cell'] *= seg.pixel_size["y_size"]
+        df_['z_cell'] *= seg.pixel_size["z_size"]
         df_.reset_index(drop=False, inplace=True)
         rotation.append(0)
         for i in range(1, len(df_)):
@@ -135,27 +135,32 @@ def edge_analysis(Segmentation):
             rotation.append(angle_rot)
     edge_pixel_df["rotation"] = rotation
 
-    edge_df.to_csv(os.path.join(Segmentation.storage_path, "edge_df.csv"))
-    edge_pixel_df.to_csv(os.path.join(Segmentation.storage_path, "edge_pixel_df.csv"))
+    edge_df.to_csv(os.path.join(seg.storage_path, "edge_df.csv"))
+    edge_pixel_df.to_csv(os.path.join(seg.storage_path, "edge_pixel_df.csv"))
 
 
-def face_analysis(Segmentation):
-    face_edge_pixel_df = pd.read_csv(os.path.join(Segmentation.storage_path, "face_edge_pixel_df.csv"),
+def face_analysis(seg: Segmentation):
+    """
+
+    :param seg : Segmentation object
+    :return:
+    """
+    face_edge_pixel_df = pd.read_csv(os.path.join(seg.storage_path, "face_edge_pixel_df.csv"),
                                      index_col="Unnamed: 0")
 
     face_edge_pixel_df['length_um'] = np.sqrt(
         (face_edge_pixel_df['x_e1_mean'] - face_edge_pixel_df['x_e2_mean']) ** 2.0 + (
                 face_edge_pixel_df['y_e1_mean'] - face_edge_pixel_df['y_e2_mean']) ** 2.0) * \
-                                      Segmentation.pixel_size[
+                                      seg.pixel_size[
                                           'x_size']
-    face_edge_pixel_df['angle'] = (np.arctan2((face_edge_pixel_df['y_e2_mean'] * Segmentation.pixel_size['y_size'] -
-                                               face_edge_pixel_df['y_mid'] * Segmentation.pixel_size[
+    face_edge_pixel_df['angle'] = (np.arctan2((face_edge_pixel_df['y_e2_mean'] * seg.pixel_size['y_size'] -
+                                               face_edge_pixel_df['y_mid'] * seg.pixel_size[
                                                    'y_size']).to_numpy(),
-                                              (face_edge_pixel_df['x_e2_mean'] * Segmentation.pixel_size['x_size'] -
-                                               face_edge_pixel_df['x_mid'] * Segmentation.pixel_size[
+                                              (face_edge_pixel_df['x_e2_mean'] * seg.pixel_size['x_size'] -
+                                               face_edge_pixel_df['x_mid'] * seg.pixel_size[
                                                    'x_size']).to_numpy()) * 180 / np.pi)
 
-    face_edge_pixel_df.to_csv(os.path.join(Segmentation.storage_path, "face_edge_pixel_df.csv"))
+    face_edge_pixel_df.to_csv(os.path.join(seg.storage_path, "face_edge_pixel_df.csv"))
 
 
 def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
@@ -174,7 +179,7 @@ def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
     if degree_convert:
         convert = 180 / np.pi
     cell_df['orient_zy'] = np.arctan2((cell_df["z_end"] - cell_df['z_start']).to_numpy(),
-                                   (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
+                                      (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
     cell_df['orient_xy'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
                                       (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
     cell_df['orient_xz'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
@@ -186,7 +191,7 @@ def calculate_lengths_curvature(data, columns):
     Calculate length of the cell (real and shortest),  and curvature.
     Real distance is the distance between each pixel (we supposed to have one pixel per z plane).
     Shortest distance is the distance between the first and last plane of the cell.
-    Curvature is calculate as $1-(short_dist/real_dist)$ .
+    Curvature is calculated as $1-(short_dist/real_dist)$ .
 
     Parameters
     ----------

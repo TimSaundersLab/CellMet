@@ -5,6 +5,7 @@ import numpy as np
 
 from scipy import ndimage as ndi
 
+
 def get_label(image, label):
     """
     Extract a mask where the label is.
@@ -34,8 +35,9 @@ def get_unique_id_in_image(image, background_value=0):
     """
     id_cells = pd.unique(image.flatten())
     id_cells.sort()
-    id_cells = np.delete(id_cells, np.where(id_cells==background_value))
+    id_cells = np.delete(id_cells, np.where(id_cells == background_value))
     return id_cells
+
 
 def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0):
     """
@@ -52,7 +54,7 @@ def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0):
     """
     img_multi = np.multiply(img_seg, img_cell_dil)
     id_unique = pd.unique(img_multi.flatten())
-    id_unique = np.delete(id_unique, np.where(id_unique==background_value))
+    id_unique = np.delete(id_unique, np.where(id_unique == background_value))
     return id_unique
 
 
@@ -65,7 +67,7 @@ def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     ----------
     img_cell (np.array): binary image of one cell
     pixel_size (dict): size of pixel
-    resize_image (bool): default True, allow to reduce np.array size around the cell to fasten the distance_transform_edt calculation.
+    resize_image (bool): default True, allow to reduce np.array() size around the cell to fasten the distance_transform_edt calculation.
 
     Returns
     -------
