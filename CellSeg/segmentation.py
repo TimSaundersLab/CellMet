@@ -66,16 +66,10 @@ class Segmentation:
                 if not overwrite:
                     print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
                     return
-
-        for c_id in self.unique_id_cells:
-            img_cell = csimage.get_label(self.label_image, c_id).astype("uint8")
-
-            # save image and its dilation
-            img_cell_dil = ndi.binary_dilation(img_cell, structure=self.struct_dil)
-            img_cell_dil = np.subtract(img_cell_dil, img_cell) * 2
-            img_comb = np.add(img_cell, img_cell_dil)
-            sp_mat = sparse.COO.from_numpy(img_comb)
-            sparse.save_npz(os.path.join(self.storage_path + "npz", str(c_id) + ".npz"), sp_mat)
+        delayed_call = [
+            joblib.delayed(save_unique_cell)(self, c_id)
+            for c_id in self.unique_id_cells]
+        joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
 
         # save mesh file
         if save_mesh:
@@ -256,9 +250,7 @@ class Segmentation:
                                                    "x_e1_mean", "y_e1_mean", "z_e1_mean",
                                                    "x_e2_mean", "y_e2_mean", "z_e2_mean",
                                                    "x_mid", "y_mid", "z_mid", ])
-
         for c_id in self.unique_id_cells:
-
             # open file
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
@@ -269,114 +261,20 @@ class Segmentation:
             ordered_neighbours, opp_cell = find_all_neighbours(sub_edges)
 
             if len(ordered_neighbours) != 0:
-
-                for c_op_index in opp_cell.keys():
-                    c_op, a, b, c, d = opp_cell[c_op_index]
-
-                    sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(int(c_op)) + ".npz"))
-                    img_cell_dil2 = sp_mat.todense()
-                    img_cell_dil2[img_cell_dil2 == 2] = 1
-                    img_face = np.multiply(img_cell_dil, img_cell_dil2)
-
-                    sparce_face = sparse.COO.from_numpy(img_face)
-                    z0, y0, x0 = sparce_face.coords
-
-                    if a is None:
-                        # a = np.nan
-                        # b = np.nan
-                        c1 = np.nan
-                        e1 = pd.DataFrame.from_dict({'x': [np.nan],
-                                                     'y': [np.nan],
-                                                     'z': [np.nan]})
-                    else:
-                        c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
-                        e1 = pd.DataFrame.from_dict({
-                            'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
-                            'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
-                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == a) &
-                                               (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
-                        })
-                    if d is None:
-                        # c = np.nan
-                        # d = np.nan
-                        c2 = np.nan
-                        e2 = pd.DataFrame.from_dict({'x1': [np.nan],
-                                                     'y1': [np.nan],
-                                                     'z': [np.nan]})
-                    else:
-                        c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
-                        e2 = pd.DataFrame.from_dict({
-                            'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                (edge_pixel_df['id_im_2'] == c) &
-                                                (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
-                            'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                                (edge_pixel_df['id_im_2'] == c) &
-                                                (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
-                            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
-                                               (edge_pixel_df['id_im_2'] == c) &
-                                               (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
-                        })
-
-                    e1_mean = e1.groupby('z').mean()
-                    e2_mean = e2.groupby('z').mean()
-
-                    df = (pd.concat((e1_mean, e2_mean), axis=1)).dropna()
-                    df['x_mid'] = (df['x'] + df["x1"]) / 2
-                    df['y_mid'] = (df['y'] + df["y1"]) / 2
-
-                    f_pixel = pd.DataFrame(np.array([np.repeat(c_id, len(np.array(x0))),
-                                                     np.repeat(c_op, len(np.array(x0))),
-                                                     np.repeat(c1, len(np.array(x0))),
-                                                     np.repeat(c2, len(np.array(x0))),
-                                                     np.array(x0),
-                                                     np.array(y0),
-                                                     np.array(z0),
-                                                     ]).T,
-                                           columns=face_columns)
-
-                    # face_pixel_df = pd.concat([face_pixel_df, f_pixel], ignore_index=True)
+                delayed_call = [
+                    joblib.delayed(face_detection)(self.storage_path, c_id, c_op_index, opp_cell, img_cell_dil,
+                                                   sub_edges, face_df.columns, face_pixel_df.columns,
+                                                   face_edge_pixel_df.columns, edge_pixel_df
+                                                   )
+                    for c_op_index in opp_cell.keys()]
+                res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+                res = [(f_edge_pixel, f_pixel, f_dict) for f_edge_pixel, f_pixel, f_dict in res if f_pixel is not None]
+                for f_edge_pixel, f_pixel, f_dict in res:
+                    face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_edge_pixel] if not df.empty],
+                                                   ignore_index=True)
                     face_pixel_df = pd.concat([df for df in [face_pixel_df, f_pixel] if not df.empty],
                                               ignore_index=True)
-
-                    tmp = {"id_im_1": c_id,
-                           "id_im_2": c_op,
-                           "edge_1": c1,
-                           "edge_2": c2,
-                           }
-
-                    f_info = pd.DataFrame.from_dict(tmp,
-                                                    orient="index").T
-
-                    # face_df = pd.concat([face_df, f_info], ignore_index=True)
-                    face_df = pd.concat([df for df in [face_df, f_info] if not df.empty],
-                                        ignore_index=True)
-
-                    tmp = {"id_im_1": np.repeat(c_id, len(e1_mean['x'])),
-                           "id_im_2": np.repeat(c_op, len(e1_mean['x'])),
-                           "edge_1": np.repeat(c1, len(e1_mean['x'])),
-                           "edge_2": np.repeat(c2, len(e1_mean['x'])),
-                           "x_e1_mean": e1_mean['x'].to_numpy(),
-                           "y_e1_mean": e1_mean['y'].to_numpy(),
-                           "z_e1_mean": e1_mean.index.to_numpy(),
-                           "x_e2_mean": e2_mean['x1'].to_numpy(),
-                           "y_e2_mean": e2_mean['y1'].to_numpy(),
-                           "z_e2_mean": e2_mean.index.to_numpy(),
-                           "x_mid": df['x_mid'].to_numpy(),
-                           "y_mid": df['y_mid'].to_numpy(),
-                           "z_mid": df.index.to_numpy(),
-                           }
-
-                    f_info = pd.DataFrame.from_dict(tmp,
-                                                    orient="index").T
-
-                    # face_edge_pixel_df = pd.concat([face_edge_pixel_df, f_info], ignore_index=True)
-                    face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_info] if not df.empty],
-                                                   ignore_index=True)
+                    face_df.loc[len(face_df)] = f_dict
 
         face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
         face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
@@ -477,6 +375,17 @@ def find_non_cyclic_paths(sub_edges):
     return d_graph, ordered_neighbours, opp_cell
 
 
+def save_unique_cell(seg, c_id):
+    img_cell = csimage.get_label(seg.label_image, c_id).astype("uint8")
+
+    # save image and its dilation
+    img_cell_dil = ndi.binary_dilation(img_cell, structure=seg.struct_dil)
+    img_cell_dil = np.subtract(img_cell_dil, img_cell) * 2
+    img_comb = np.add(img_cell, img_cell_dil)
+    sp_mat = sparse.COO.from_numpy(img_comb)
+    sparse.save_npz(os.path.join(seg.storage_path + "npz", str(c_id) + ".npz"), sp_mat)
+
+
 def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil, cb, cc):
     sp_mat = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(int(cb)) + ".npz"))
     img_cell_b_dil = sp_mat.todense()
@@ -543,3 +452,115 @@ def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_ce
               "z_center": z0.mean(),
               }
     return e_pixel, e_dict
+
+
+def face_detection(path, c_id, c_op_index, opp_cell, img_cell_dil, sub_edges, face_columns, face_pixel_columns,
+                   face_edge_pixel_columns, edge_pixel_df):
+    c_op, a, b, c, d = opp_cell[c_op_index]
+
+    sp_mat = sparse.load_npz(os.path.join(path, "npz/" + str(int(c_op)) + ".npz"))
+    img_cell_dil2 = sp_mat.todense()
+    img_cell_dil2[img_cell_dil2 == 2] = 1
+    img_face = np.multiply(img_cell_dil, img_cell_dil2)
+
+    sparce_face = sparse.COO.from_numpy(img_face)
+    z0, y0, x0 = sparce_face.coords
+
+    if a is None:
+        # a = np.nan
+        # b = np.nan
+        c1 = np.nan
+        e1 = pd.DataFrame.from_dict({'x': [np.nan],
+                                     'y': [np.nan],
+                                     'z': [np.nan]})
+    else:
+        c1 = sub_edges[(sub_edges['id_im_2'] == a) & (sub_edges['id_im_3'] == b)].index[0]
+        e1 = pd.DataFrame.from_dict({
+            'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                               (edge_pixel_df['id_im_2'] == a) &
+                               (edge_pixel_df['id_im_3'] == b)]['x_cell'].to_numpy(),
+            'y': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                               (edge_pixel_df['id_im_2'] == a) &
+                               (edge_pixel_df['id_im_3'] == b)]['y_cell'].to_numpy(),
+            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                               (edge_pixel_df['id_im_2'] == a) &
+                               (edge_pixel_df['id_im_3'] == b)]['z_cell'].to_numpy()
+        })
+    if d is None:
+        # c = np.nan
+        # d = np.nan
+        c2 = np.nan
+        e2 = pd.DataFrame.from_dict({'x1': [np.nan],
+                                     'y1': [np.nan],
+                                     'z': [np.nan]})
+    else:
+        c2 = sub_edges[(sub_edges['id_im_2'] == c) & (sub_edges['id_im_3'] == d)].index[0]
+        e2 = pd.DataFrame.from_dict({
+            'x1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                (edge_pixel_df['id_im_2'] == c) &
+                                (edge_pixel_df['id_im_3'] == d)]['x_cell'].to_numpy(),
+            'y1': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                                (edge_pixel_df['id_im_2'] == c) &
+                                (edge_pixel_df['id_im_3'] == d)]['y_cell'].to_numpy(),
+            'z': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
+                               (edge_pixel_df['id_im_2'] == c) &
+                               (edge_pixel_df['id_im_3'] == d)]['z_cell'].to_numpy()
+        })
+
+    e1_mean = e1.groupby('z').mean()
+    e2_mean = e2.groupby('z').mean()
+
+    df = (pd.concat((e1_mean, e2_mean), axis=1)).dropna()
+    df['x_mid'] = (df['x'] + df["x1"]) / 2
+    df['y_mid'] = (df['y'] + df["y1"]) / 2
+
+    f_pixel = pd.DataFrame(np.array([np.repeat(c_id, len(np.array(x0))),
+                                     np.repeat(c_op, len(np.array(x0))),
+                                     np.repeat(c1, len(np.array(x0))),
+                                     np.repeat(c2, len(np.array(x0))),
+                                     np.array(x0),
+                                     np.array(y0),
+                                     np.array(z0),
+                                     ]).T,
+                           columns=face_pixel_columns)
+
+    # face_pixel_df = pd.concat([face_pixel_df, f_pixel], ignore_index=True)
+    # face_pixel_df = pd.concat([df for df in [face_pixel_df, f_pixel] if not df.empty],
+    #                          ignore_index=True)
+
+    f_dict = {"id_im_1": c_id,
+              "id_im_2": c_op,
+              "edge_1": c1,
+              "edge_2": c2,
+              }
+
+    # f_info = pd.DataFrame.from_dict(tmp,
+    #                                orient="index").T
+
+    # face_df = pd.concat([face_df, f_info], ignore_index=True)
+    # face_df = pd.concat([df for df in [face_df, f_info] if not df.empty],
+    #                    ignore_index=True)
+
+    tmp = {"id_im_1": np.repeat(c_id, len(e1_mean['x'])),
+           "id_im_2": np.repeat(c_op, len(e1_mean['x'])),
+           "edge_1": np.repeat(c1, len(e1_mean['x'])),
+           "edge_2": np.repeat(c2, len(e1_mean['x'])),
+           "x_e1_mean": e1_mean['x'].to_numpy(),
+           "y_e1_mean": e1_mean['y'].to_numpy(),
+           "z_e1_mean": e1_mean.index.to_numpy(),
+           "x_e2_mean": e2_mean['x1'].to_numpy(),
+           "y_e2_mean": e2_mean['y1'].to_numpy(),
+           "z_e2_mean": e2_mean.index.to_numpy(),
+           "x_mid": df['x_mid'].to_numpy(),
+           "y_mid": df['y_mid'].to_numpy(),
+           "z_mid": df.index.to_numpy(),
+           }
+
+    f_edge_pixel = pd.DataFrame.from_dict(tmp,
+                                          orient="index").T
+
+    # face_edge_pixel_df = pd.concat([face_edge_pixel_df, f_info], ignore_index=True)
+    # face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_info] if not df.empty],
+    #                               ignore_index=True)
+
+    return f_edge_pixel, f_pixel, f_dict
