@@ -8,10 +8,10 @@ from vtk import (vtkPolyData,
                  vtkPolyDataNormals,
                  vtkOBJWriter
                  )
-
+import os
 from tifffile import tifffile
 from skimage import measure
-
+import numpy as np
 from . import image as csimage
 
 

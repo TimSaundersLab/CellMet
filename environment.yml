@@ -13,13 +13,10 @@ dependencies:
   - pytables
   - jupyter
   - notebook
-  - quantities
   - ipywidgets
   - pythreejs
   - ipyvolume
-  - vispy
   - meshio
-  - zarr
   - xarray
   - vtk
   - tifffile
@@ -29,3 +26,7 @@ dependencies:
   - os
   - sparse
   - networkx
+  #- vispy
+  #- zarr
+  #- quantities
+  #

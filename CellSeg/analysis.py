@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 from scipy.spatial import ConvexHull
-
+from skimage.transform import resize
 from .segmentation import Segmentation
 from . import utils as csutils
 from . import image as csimage
@@ -26,10 +26,18 @@ def cell_analysis(seg: Segmentation):
 
     # Calculate volume
     volume = []
+    area = []
     for c_id in cell_df['id_im']:
         sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
         volume.append(len(sparse_cell.coords[0]) * seg.voxel_size)
+        # resize image to have same pixel size in xyz
+        img_resize = resize(sparse_cell.todense()==2, (int(sparse_cell.shape[0]*seg.pixel_size["z_size"]/seg.pixel_size["x_size"]),
+                                                       sparse_cell.shape[1],
+                                                       sparse_cell.shape[2]))
+
+        area.append(np.count_nonzero(img_resize == 1)*seg.pixel_size["x_size"])
     cell_df["volume"] = volume
+    cell_df["area"] = area
 
     # Calculate cell lengths and curvature
     real_dist = []

@@ -8,6 +8,10 @@ A generalist algorithm for cell segmentation from 3D labeled image.
 
 This code is made to analyse cells from 3D labeled image. We determine edges and faces associated to each cell. Quality of this analysis is dependant of the quality of the labeled image. There is no segmentation correction.
 
+There is a Python API to allow user to integrate CellSeg into your custom workflow.  
+There is a Napari plugin for interacting graphically with CellSeg tool. -- Coming soon --
+
+
 ## Segmentation output
 Segmentation part generate 7 csv files, that can be populated later during the analysis part.
 - __cell_plane_df.csv__ contains measure relative to the cell, such as volume, number of neighbours, orientation, curvature
