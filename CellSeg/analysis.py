@@ -1,5 +1,6 @@
 import os
 import sparse
+import joblib
 
 import pandas as pd
 import numpy as np
@@ -9,6 +10,55 @@ from skimage.transform import resize
 from .segmentation import Segmentation
 from . import utils as csutils
 from . import image as csimage
+
+
+def single_cell_analysis(seg: Segmentation, parallelized=True):
+    """
+    Analyse cell shape that only require one cell.
+    :param seg: Segmentation object
+    :param parallelized: bool to parallelized analysis
+    :return:
+    """
+    if os.path.exists(os.path.join(seg.storage_path, "cell_df.csv")):
+        cell_df = pd.read_csv(os.path.join(seg.storage_path, "cell_df.csv"),
+                              index_col="Unnamed: 0")
+    else:
+        cell_columns = ["id_im",
+                        "volume",
+                        "area",
+                        ]
+        cell_df = pd.DataFrame(columns=cell_columns)
+
+    if parallelized:
+        delayed_call = [joblib.delayed(s_c_analysis)(seg, int(c_id)) for c_id in seg.unique_id_cells]
+        res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+        for r in res:
+            cell_df.loc[len(cell_df)] = r
+    else:
+        for c_id in seg.unique_id_cells:
+            res = s_c_analysis(seg, int(c_id))
+            cell_df.loc[len(cell_df)] = res
+
+    # Save dataframe
+    cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
+
+
+def s_c_analysis(seg, c_id):
+    # open image
+    sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+
+    volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
+    img_resize = resize(sparse_cell.todense() == 2,
+                        (int(sparse_cell.shape[0] * seg.pixel_size["z_size"] / seg.pixel_size["x_size"]),
+                         sparse_cell.shape[1],
+                         sparse_cell.shape[2]))
+
+    area = np.count_nonzero(img_resize == 1) * seg.pixel_size["x_size"]
+    out = {"id_im": int(c_id),
+           "volume": volume,
+           "area": area,
+           }
+    return out
 
 
 def cell_analysis(seg: Segmentation):
@@ -31,11 +81,12 @@ def cell_analysis(seg: Segmentation):
         sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
         volume.append(len(sparse_cell.coords[0]) * seg.voxel_size)
         # resize image to have same pixel size in xyz
-        img_resize = resize(sparse_cell.todense()==2, (int(sparse_cell.shape[0]*seg.pixel_size["z_size"]/seg.pixel_size["x_size"]),
-                                                       sparse_cell.shape[1],
-                                                       sparse_cell.shape[2]))
+        img_resize = resize(sparse_cell.todense() == 2,
+                            (int(sparse_cell.shape[0] * seg.pixel_size["z_size"] / seg.pixel_size["x_size"]),
+                             sparse_cell.shape[1],
+                             sparse_cell.shape[2]))
 
-        area.append(np.count_nonzero(img_resize == 1)*seg.pixel_size["x_size"])
+        area.append(np.count_nonzero(img_resize == 1) * seg.pixel_size["x_size"])
     cell_df["volume"] = volume
     cell_df["area"] = area
 
