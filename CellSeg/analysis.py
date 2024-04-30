@@ -37,7 +37,7 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
 
     if os.path.exists(os.path.join(seg.storage_path, "cell_plane_df.csv")):
         cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
-                              index_col="Unnamed: 0")
+                                    index_col="Unnamed: 0")
     else:
         cell_plane_columns = ["id_im",
                               "x_center",
@@ -57,7 +57,8 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
     if parallelized:
-        delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in seg.unique_id_cells]
+        delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in
+                        seg.unique_id_cells]
         res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
         for cell_out, cell_plane_out in res:
             cell_df.loc[len(cell_df)] = cell_out
@@ -97,11 +98,11 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
     if degree_convert:
         convert = 180 / np.pi
     orient_zy = np.arctan2((end[2] - start[2]),
-                          (end[1] - start[1])) * convert
+                           (end[1] - start[1])) * convert
     orient_xy = np.arctan2((end[0] - start[0]),
-                          (end[1] - start[1])) * convert
+                           (end[1] - start[1])) * convert
     orient_xz = np.arctan2((end[0] - start[0]),
-                          (end[2] - start[2])) * convert
+                           (end[2] - start[2])) * convert
 
     volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
     img_resize = resize(sparse_cell.todense() == 2,
@@ -120,61 +121,9 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
                 "orient_zy": orient_zy,
                 "orient_xy": orient_xy,
                 "orient_xz": orient_xz,
-           }
-
+                }
 
     return cell_out, cell_plane_out
-
-
-def cell_analysis(seg: Segmentation, parallelized=True):
-    """
-
-    :param seg : Segmentation object
-    :param parallelized :
-    :return:
-    """
-
-    # Calculate volume & area
-    # cell length & curvature
-    single_cell_analysis(seg, parallelized=parallelized)
-
-    # Open cell_df
-    cell_df = pd.read_csv(os.path.join(seg.storage_path, "cell_df.csv"),
-                          index_col="Unnamed: 0")
-    cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
-                                index_col="Unnamed: 0")
-
-    # Measure cell plane metrics
-    aniso = []
-    orientation_x = []
-    orientation_y = []
-    major = []
-    minor = []
-    area = []
-    perimeter = []
-    for c_id in cell_df['id_im']:
-        sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
-        img_cell = sparse_cell.todense()
-        img_cell = csimage.get_label(img_cell, 1).astype("uint8")
-
-        (a, ox, oy, maj, mi, ar, per) = measure_cell_plane(img_cell, seg.pixel_size)
-        aniso.extend(a)
-        orientation_x.extend(ox)
-        orientation_y.extend(oy)
-        major.extend(maj)
-        minor.extend(mi)
-        area.extend(ar)
-        perimeter.extend(per)
-    cell_plane_df["aniso"] = aniso
-    cell_plane_df["orientation_x"] = orientation_x
-    cell_plane_df["orientation_y"] = orientation_y
-    cell_plane_df["major"] = major
-    cell_plane_df["minor"] = minor
-    cell_plane_df["area"] = area
-    cell_plane_df["perimeter"] = perimeter
-
-    cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
-    cell_plane_df.to_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"))
 
 
 def edge_analysis(seg: Segmentation):
