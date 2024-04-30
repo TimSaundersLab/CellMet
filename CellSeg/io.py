@@ -90,6 +90,9 @@ def label2vtk(segmentation, label, step_size=1):
     vtkPoly = ndarray2vtkMesh(vertx, faces.astype(int))
     return vtkPoly
 
+def make_mesh_file_para(image, cell_id, meshtype="ply", step_size=1, path=""):
+    vtkPoly = label2vtk(image, cell_id, step_size)
+    write_mesh(vtkPoly, meshtype, os.path.join(path, str(cell_id)))
 
 def make_mesh_file(image, id_unique_cell=None, meshtype="ply", step_size=1, path=""):
     """

@@ -70,18 +70,27 @@ class Segmentation:
             if len(list_dir) > 0:
                 if not overwrite:
                     print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
-                    return
-        delayed_call = [
-            joblib.delayed(save_unique_cell)(self, c_id)
-            for c_id in self.unique_id_cells]
-        joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+                    # return
+        list_dir = os.listdir(self.storage_path + "npz")
+        if overwrite or (len(list_dir)==0):
+            delayed_call = [
+                joblib.delayed(save_unique_cell)(self, c_id)
+                for c_id in self.unique_id_cells]
+            joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
 
         # save mesh file
         if save_mesh:
-            csio.make_mesh_file(self.label_image,
-                                self.unique_id_cells,
-                                meshtype=meshtype,
-                                path=os.path.join(self.storage_path, "obj_mesh"))
+            # csio.make_mesh_file(self.label_image,
+            #                     self.unique_id_cells,
+            #                     meshtype=meshtype,
+            #                     path=os.path.join(self.storage_path, "obj_mesh"))
+            delayed_call = [
+                joblib.delayed(csio.make_mesh_file_para)(self.label_image,
+                                                           c_id,
+                                                           meshtype=meshtype,
+                                                           path=os.path.join(self.storage_path, "obj_mesh"))
+                for c_id in self.unique_id_cells]
+            joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
 
     def all_segmentation(self):
         self.cell_segmentation()
