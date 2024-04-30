@@ -110,6 +110,10 @@ def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     result = pd.DataFrame(data=[np.array(x_c),
                                 np.array(y_c),
                                 np.array(z_c),
+                                np.array(x_c)*pixel_size["x_size"],
+                                np.array(y_c)*pixel_size["y_size"],
+                                np.array(z_c)*pixel_size["z_size"],
                                 ]).T
-    result.columns = ["x_center", "y_center", "z_center"]
+    result.columns = ["x_center", "y_center", "z_center",
+                      "x_center_um", "y_center_um", "z_center_um"]
     return result

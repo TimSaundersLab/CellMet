@@ -12,7 +12,7 @@ from . import utils as csutils
 from . import image as csimage
 
 
-def single_cell_analysis(seg: Segmentation, parallelized=True):
+def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     """
     Analyse cell shape that only require one cell.
     :param seg: Segmentation object
@@ -26,86 +26,123 @@ def single_cell_analysis(seg: Segmentation, parallelized=True):
         cell_columns = ["id_im",
                         "volume",
                         "area",
+                        "real_dist",
+                        "short_dist",
+                        "curv_ind",
+                        "orient_zy",
+                        "orient_xy",
+                        "orient_xz",
                         ]
         cell_df = pd.DataFrame(columns=cell_columns)
 
+    if os.path.exists(os.path.join(seg.storage_path, "cell_plane_df.csv")):
+        cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
+                              index_col="Unnamed: 0")
+    else:
+        cell_plane_columns = ["id_im",
+                              "x_center",
+                              "y_center",
+                              "z_center",
+                              "x_center_um",
+                              "y_center_um",
+                              "z_center_um",
+                              "aniso",
+                              "orientation_x",
+                              "orientation_y",
+                              "major",
+                              "minor",
+                              "area",
+                              "perimeter"
+                              ]
+        cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
+
     if parallelized:
-        delayed_call = [joblib.delayed(s_c_analysis)(seg, int(c_id)) for c_id in seg.unique_id_cells]
+        delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in seg.unique_id_cells]
         res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
-        for r in res:
-            cell_df.loc[len(cell_df)] = r
+        for cell_out, cell_plane_out in res:
+            cell_df.loc[len(cell_df)] = cell_out
+            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(cell_plane_out)], ignore_index=True)
     else:
         for c_id in seg.unique_id_cells:
-            res = s_c_analysis(seg, int(c_id))
-            cell_df.loc[len(cell_df)] = res
+            res = sc_analysis_parallel(seg, int(c_id))
+            cell_df.loc[len(cell_df)] = res[0]
+            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(res[1])], ignore_index=True)
 
     # Save dataframe
     cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
+    cell_plane_df.to_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"))
 
 
-def s_c_analysis(seg, c_id):
+def sc_analysis_parallel(seg, c_id, degree_convert=True):
     # open image
     sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+
+    img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
+    data_ = csimage.find_cell_axis_center(img_cell, seg.pixel_size, resize_image=True)
+
+    (a, ox, oy, maj, mi, ar, per) = measure_cell_plane(img_cell, seg.pixel_size)
+
+    cell_plane_out = np.array([np.repeat(c_id, len(data_["x_center"].to_numpy())),
+                               data_["x_center"].to_numpy(),
+                               data_["y_center"].to_numpy(),
+                               data_["z_center"].to_numpy(),
+                               data_["x_center_um"].to_numpy(),
+                               data_["y_center_um"].to_numpy(),
+                               data_["z_center_um"].to_numpy(),
+                               a, ox, oy, maj, mi, ar, per,
+                               ])
+    start = data_[["x_center", "y_center", "z_center"]].to_numpy()[0]
+    end = data_[["x_center", "y_center", "z_center"]].to_numpy()[-1]
+    convert = 1
+    if degree_convert:
+        convert = 180 / np.pi
+    orient_zy = np.arctan2((end[2] - start[2]),
+                          (end[1] - start[1])) * convert
+    orient_xy = np.arctan2((end[0] - start[0]),
+                          (end[1] - start[1])) * convert
+    orient_xz = np.arctan2((end[0] - start[0]),
+                          (end[2] - start[2])) * convert
 
     volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
     img_resize = resize(sparse_cell.todense() == 2,
                         (int(sparse_cell.shape[0] * seg.pixel_size["z_size"] / seg.pixel_size["x_size"]),
                          sparse_cell.shape[1],
                          sparse_cell.shape[2]))
-
     area = np.count_nonzero(img_resize == 1) * seg.pixel_size["x_size"]
-    out = {"id_im": int(c_id),
-           "volume": volume,
-           "area": area,
+
+    rd, sd, ci = calculate_lengths_curvature(data_, columns=["x_center_um", "y_center_um", "z_center_um"])
+    cell_out = {"id_im": int(c_id),
+                "volume": volume,
+                "area": area,
+                "real_dist": rd,
+                "short_dist": sd,
+                "curv_ind": ci,
+                "orient_zy": orient_zy,
+                "orient_xy": orient_xy,
+                "orient_xz": orient_xz,
            }
-    return out
 
 
-def cell_analysis(seg: Segmentation):
+    return cell_out, cell_plane_out
+
+
+def cell_analysis(seg: Segmentation, parallelized=True):
     """
 
     :param seg : Segmentation object
+    :param parallelized :
     :return:
     """
+
+    # Calculate volume & area
+    # cell length & curvature
+    single_cell_analysis(seg, parallelized=parallelized)
 
     # Open cell_df
     cell_df = pd.read_csv(os.path.join(seg.storage_path, "cell_df.csv"),
                           index_col="Unnamed: 0")
     cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
                                 index_col="Unnamed: 0")
-
-    # Calculate volume
-    volume = []
-    area = []
-    for c_id in cell_df['id_im']:
-        sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
-        volume.append(len(sparse_cell.coords[0]) * seg.voxel_size)
-        # resize image to have same pixel size in xyz
-        img_resize = resize(sparse_cell.todense() == 2,
-                            (int(sparse_cell.shape[0] * seg.pixel_size["z_size"] / seg.pixel_size["x_size"]),
-                             sparse_cell.shape[1],
-                             sparse_cell.shape[2]))
-
-        area.append(np.count_nonzero(img_resize == 1) * seg.pixel_size["x_size"])
-    cell_df["volume"] = volume
-    cell_df["area"] = area
-
-    # Calculate cell lengths and curvature
-    real_dist = []
-    short_dist = []
-    curv_ind = []
-    for c_id in cell_df['id_im']:
-        df_ = cell_plane_df[cell_plane_df['id_im'] == c_id].copy()
-        df_['x_center'] *= seg.pixel_size["x_size"]
-        df_['y_center'] *= seg.pixel_size["y_size"]
-        df_['z_center'] *= seg.pixel_size["z_size"]
-        rd, sd, ci = calculate_lengths_curvature(df_, columns=["x_center", "y_center", "z_center"])
-        real_dist.append(rd)
-        short_dist.append(sd)
-        curv_ind.append(ci)
-    cell_df["real_dist"] = real_dist
-    cell_df["short_dist"] = short_dist
-    cell_df["curv_ind"] = curv_ind
 
     # Measure cell plane metrics
     aniso = []
@@ -135,8 +172,6 @@ def cell_analysis(seg: Segmentation):
     cell_plane_df["minor"] = minor
     cell_plane_df["area"] = area
     cell_plane_df["perimeter"] = perimeter
-
-    calculate_cell_orientation(cell_df, cell_plane_df)
 
     cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
     cell_plane_df.to_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"))
@@ -222,27 +257,27 @@ def face_analysis(seg: Segmentation):
     face_edge_pixel_df.to_csv(os.path.join(seg.storage_path, "face_edge_pixel_df.csv"))
 
 
-def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
-    start = []
-    end = []
-    for i, val in cell_df.iterrows():
-        start.append(
-            cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[0])
-        end.append(
-            cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[-1])
-
-    cell_df[['x_start', 'y_start', 'z_start']] = start
-    cell_df[['x_end', 'y_end', 'z_end']] = end
-
-    convert = 1
-    if degree_convert:
-        convert = 180 / np.pi
-    cell_df['orient_zy'] = np.arctan2((cell_df["z_end"] - cell_df['z_start']).to_numpy(),
-                                      (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
-    cell_df['orient_xy'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
-                                      (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
-    cell_df['orient_xz'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
-                                      (cell_df["z_end"] - cell_df['z_start']).to_numpy()) * convert
+# def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
+#     start = []
+#     end = []
+#     for i, val in cell_df.iterrows():
+#         start.append(
+#             cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[0])
+#         end.append(
+#             cell_plane_df[cell_plane_df["id_im"] == val["id_im"]][['x_center', 'y_center', 'z_center']].to_numpy()[-1])
+#
+#     cell_df[['x_start', 'y_start', 'z_start']] = start
+#     cell_df[['x_end', 'y_end', 'z_end']] = end
+#
+#     convert = 1
+#     if degree_convert:
+#         convert = 180 / np.pi
+#     cell_df['orient_zy'] = np.arctan2((cell_df["z_end"] - cell_df['z_start']).to_numpy(),
+#                                       (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
+#     cell_df['orient_xy'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
+#                                       (cell_df["y_end"] - cell_df['y_start']).to_numpy()) * convert
+#     cell_df['orient_xz'] = np.arctan2((cell_df["x_end"] - cell_df['x_start']).to_numpy(),
+#                                       (cell_df["z_end"] - cell_df['z_start']).to_numpy()) * convert
 
 
 def calculate_lengths_curvature(data, columns):
