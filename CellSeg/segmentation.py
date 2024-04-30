@@ -15,7 +15,7 @@ from . import io as csio
 
 class Segmentation:
 
-    def __init__(self, image=None, pixel_size=None, path=None):
+    def __init__(self, image=None, pixel_size=None, path=None, nb_core=None):
         """Segmentation class constructor
         """
 
@@ -37,6 +37,11 @@ class Segmentation:
             self.storage_path = path
         else:
             self.storage_path = ""
+
+        if nb_core is None:
+            self.nb_core = os.cpu_count() - 2
+        else:
+            self.nb_core = nb_core
 
     def perform_prerequisite(self, overwrite=False, save_mesh=False, meshtype="ply"):
         """
@@ -69,7 +74,7 @@ class Segmentation:
         delayed_call = [
             joblib.delayed(save_unique_cell)(self, c_id)
             for c_id in self.unique_id_cells]
-        joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+        joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
 
         # save mesh file
         if save_mesh:
@@ -218,7 +223,7 @@ class Segmentation:
                 joblib.delayed(edge_detection)(self, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil,
                                                cb, cc)
                 for cb, cc in cell_combi]
-            res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+            res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
             res = [(e_pixel, e_dict) for e_pixel, e_dict in res if e_pixel is not None]
             for e_pixel, e_dict in res:
                 edge_pixel_df = pd.concat([df for df in [edge_pixel_df, e_pixel] if not df.empty],
@@ -267,7 +272,7 @@ class Segmentation:
                                                    face_edge_pixel_df.columns, edge_pixel_df
                                                    )
                     for c_op_index in opp_cell.keys()]
-                res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+                res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
                 res = [(f_edge_pixel, f_pixel, f_dict) for f_edge_pixel, f_pixel, f_dict in res if f_pixel is not None]
                 for f_edge_pixel, f_pixel, f_dict in res:
                     face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_edge_pixel] if not df.empty],

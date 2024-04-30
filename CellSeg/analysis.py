@@ -59,7 +59,7 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     if parallelized:
         delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in
                         seg.unique_id_cells]
-        res = joblib.Parallel(n_jobs=os.cpu_count() - 2)(delayed_call)
+        res = joblib.Parallel(n_jobs=seg.nb_core)(delayed_call)
         for cell_out, cell_plane_out in res:
             cell_df.loc[len(cell_df)] = cell_out
             cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(cell_plane_out)], ignore_index=True)
