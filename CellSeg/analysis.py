@@ -60,14 +60,14 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
                           "area",
                           "perimeter"
                           ]
-    if os.path.exists(os.path.join(seg.storage_path, "cell_plane_df.csv")):
-        cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
-                                    index_col="Unnamed: 0")
-        for c in cell_plane_columns:
-            if c not in cell_plane_df.columns:
-                cell_plane_df[c] = np.nan
-    else:
-        cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
+    # if os.path.exists(os.path.join(seg.storage_path, "cell_plane_df.csv")):
+    #     cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
+    #                                 index_col="Unnamed: 0")
+    #     for c in cell_plane_columns:
+    #         if c not in cell_plane_df.columns:
+    #             cell_plane_df[c] = np.nan
+    # else:
+    cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
 
     if parallelized:
@@ -77,13 +77,13 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
         for cell_out, cell_plane_out in res:
             for k in cell_out.keys():
                 cell_df.loc[cell_df[cell_df["id_im"]==cell_out.get("id_im")].index[0], k] = cell_out.get(k)
-            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(cell_plane_out)], ignore_index=True)
+            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(cell_plane_out,  columns=cell_plane_columns)], ignore_index=True)
     else:
         for c_id in seg.unique_id_cells:
             res = sc_analysis_parallel(seg, int(c_id))
             for k in res[0].keys():
                 cell_df.loc[cell_df[cell_df["id_im"] == res[0].get("id_im")].index[0], k] = res[0].get(k)
-            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(res[1])], ignore_index=True)
+            cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(res[1], columns=cell_plane_columns)], ignore_index=True)
 
     # Save dataframe
     cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
@@ -107,7 +107,7 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
                                data_["y_center_um"].to_numpy(),
                                data_["z_center_um"].to_numpy(),
                                a, ox, oy, maj, mi, ar, per,
-                               ])
+                               ]).T
     start = data_[["x_center", "y_center", "z_center"]].to_numpy()[0]
     end = data_[["x_center", "y_center", "z_center"]].to_numpy()[-1]
     convert = 1
