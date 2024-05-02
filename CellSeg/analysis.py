@@ -19,54 +19,70 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     :param parallelized: bool to parallelized analysis
     :return:
     """
+    cell_columns = ["id_im",
+                    "volume",
+                    "area",
+                    "real_dist",
+                    "short_dist",
+                    "curv_ind",
+                    "orient_zy",
+                    "orient_xy",
+                    "orient_xz",
+                    'x_start',
+                    'y_start',
+                    'z_start',
+                    'x_end',
+                    'y_end',
+                    'z_end',
+                    ]
     if os.path.exists(os.path.join(seg.storage_path, "cell_df.csv")):
         cell_df = pd.read_csv(os.path.join(seg.storage_path, "cell_df.csv"),
                               index_col="Unnamed: 0")
+        for c in cell_columns:
+            if c not in cell_df.columns:
+                cell_df[c] = np.nan
     else:
-        cell_columns = ["id_im",
-                        "volume",
-                        "area",
-                        "real_dist",
-                        "short_dist",
-                        "curv_ind",
-                        "orient_zy",
-                        "orient_xy",
-                        "orient_xz",
-                        ]
         cell_df = pd.DataFrame(columns=cell_columns)
+        cell_df["id_im"] = seg.unique_id_cells
 
+    cell_plane_columns = ["id_im",
+                          "x_center",
+                          "y_center",
+                          "z_center",
+                          "x_center_um",
+                          "y_center_um",
+                          "z_center_um",
+                          "aniso",
+                          "orientation_x",
+                          "orientation_y",
+                          "major",
+                          "minor",
+                          "area",
+                          "perimeter"
+                          ]
     if os.path.exists(os.path.join(seg.storage_path, "cell_plane_df.csv")):
         cell_plane_df = pd.read_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"),
                                     index_col="Unnamed: 0")
+        for c in cell_plane_columns:
+            if c not in cell_plane_df.columns:
+                cell_plane_df[c] = np.nan
     else:
-        cell_plane_columns = ["id_im",
-                              "x_center",
-                              "y_center",
-                              "z_center",
-                              "x_center_um",
-                              "y_center_um",
-                              "z_center_um",
-                              "aniso",
-                              "orientation_x",
-                              "orientation_y",
-                              "major",
-                              "minor",
-                              "area",
-                              "perimeter"
-                              ]
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
+
 
     if parallelized:
         delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in
                         seg.unique_id_cells]
         res = joblib.Parallel(n_jobs=seg.nb_core)(delayed_call)
         for cell_out, cell_plane_out in res:
-            cell_df.loc[len(cell_df)] = cell_out
+            for k in cell_out.keys():
+                cell_df.loc[cell_df[cell_df["id_im"]==cell_out.get("id_im")].index[0], k] = cell_out.get(k)
             cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(cell_plane_out)], ignore_index=True)
     else:
         for c_id in seg.unique_id_cells:
             res = sc_analysis_parallel(seg, int(c_id))
-            cell_df.loc[len(cell_df)] = res[0]
+            for k in res[0].keys():
+                cell_df.loc[cell_df[cell_df["id_im"] == res[0].get("id_im")].index[0], k] = res[0].get(k)
             cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(res[1])], ignore_index=True)
 
     # Save dataframe
@@ -121,6 +137,12 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
                 "orient_zy": orient_zy,
                 "orient_xy": orient_xy,
                 "orient_xz": orient_xz,
+                'x_start': start[0],
+                'y_start': start[1],
+                'z_start': start[2],
+                'x_end': end[0],
+                'y_end': end[1],
+                'z_end': end[2],
                 }
 
     return cell_out, cell_plane_out
