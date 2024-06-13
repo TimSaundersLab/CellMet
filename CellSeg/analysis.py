@@ -311,25 +311,45 @@ def measure_cell_plane(img_cell, pixel_size):
         points = np.array(np.where(img_cell[z, :, :] > 0)).flatten().reshape(len(np.where(img_cell[z, :, :] > 0)[1]),
                                                                              2,
                                                                              order='F')
-        hull = ConvexHull(points)
+        if len(points)>10:
+            try:
+                hull = ConvexHull(points)
 
-        # Measure cell anisotropy
-        # need to center the face at 0, 0
-        # otherwise the calculation is wrong
-        pts = (points - points.mean(axis=0)) * pixel_size['x_size']
-        u, s, vh = np.linalg.svd(pts)
-        svd = np.concatenate((s, vh[0, :]))
+                # Measure cell anisotropy
+                # need to center the face at 0, 0
+                # otherwise the calculation is wrong
+                pts = (points - points.mean(axis=0)) * pixel_size['x_size']
+                u, s, vh = np.linalg.svd(pts)
+                svd = np.concatenate((s, vh[0, :]))
 
-        s.sort()
-        s = s[::-1]
+                s.sort()
+                s = s[::-1]
 
-        orientation = svd[2:]
-        aniso.append(s[0] / s[1])
-        orientation_x.append(orientation[0])
-        orientation_y.append(orientation[1])
-        major.append(s[0])
-        minor.append(s[1])
-        perimeter.append(hull.area)
-        area.append(hull.volume)
+                orientation = svd[2:]
+                aniso.append(s[0] / s[1])
+                orientation_x.append(orientation[0])
+                orientation_y.append(orientation[1])
+                major.append(s[0])
+                minor.append(s[1])
+                perimeter.append(hull.area)
+                area.append(hull.volume)
+            except:
+                aniso.append(np.nan)
+                orientation_x.append(np.nan)
+                orientation_y.append(np.nan)
+                major.append(np.nan)
+                minor.append(np.nan)
+                perimeter.append(np.nan)
+                area.append(np.nan)
+
+        else:
+            aniso.append(np.nan)
+            orientation_x.append(np.nan)
+            orientation_y.append(np.nan)
+            major.append(np.nan)
+            minor.append(np.nan)
+            perimeter.append(np.nan)
+            area.append(np.nan)
+
 
     return aniso, orientation_x, orientation_y, major, minor, area, perimeter

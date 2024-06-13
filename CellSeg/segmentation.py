@@ -216,7 +216,7 @@ class Segmentation:
         edge_df = pd.DataFrame(columns=edge_columns)
 
         for c_id in self.unique_id_cells:
-
+            print(c_id)
             # step 1
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell1_dil = sp_mat.todense()
@@ -239,8 +239,8 @@ class Segmentation:
                                           ignore_index=True)
                 edge_df.loc[len(edge_df)] = e_dict
 
-        edge_df.to_csv(os.path.join(self.storage_path, "edge_df.csv"))
-        edge_pixel_df.to_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
+            edge_df.to_csv(os.path.join(self.storage_path, "edge_df.csv"))
+            edge_pixel_df.to_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
 
     def face_segmentation(self):
         """
