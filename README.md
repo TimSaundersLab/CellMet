@@ -1,18 +1,25 @@
 # CellSeg
-A generalist algorithm for cell segmentation from 3D labeled image. 
+A generalist algorithm to analyse cell shape from 3D labeled image. 
 
 <p align="center">
- <img src="doc/image/banner.png" width="600">
+ <img src="doc/image/figure_1.png" width="300">
 </p>
 
 
-This code is made to analyse cells from 3D labeled image. We determine edges and faces associated to each cell. Quality of this analysis is dependant of the quality of the labeled image. There is no segmentation correction.
+This code is made to analyse cell shape from 3D labeled image. It is divide in three parts:
+- Prerequisite that will create image containing one cell. This is mandatory to fasten the following analysis. 
+- We determine edges and faces associated to each cell. Quality of this analysis is dependant of the quality of the labeled image. There is no segmentation correction.
+- Analysis of cells, faces and edges. 
 
-There is a Python API to allow user to integrate CellSeg into your custom workflow.  
-There is a Napari plugin for interacting graphically with CellSeg tool. -- Coming soon --
+There is a Python API to allow user to integrate CellSeg into your custom workflow.
 
+## Input/output 
+### Input
+In order to be able to use this project. You first need to segment you image using CellPose (or any other software that gives 3D label image). You need to be satisfied by your label image, since there is no manual correction (only filter can be apply to remove cells that has a volume below a threshold for example).  
+Then, you can perform 3D cell segmentation with CellSeg. 
 
-## Segmentation output
+### Output
+You can generate ply/obj file for each cells.
 Segmentation part generate 7 csv files, that can be populated later during the analysis part.
 - __cell_plane_df.csv__ contains measure relative to the cell, such as volume, number of neighbours, orientation, curvature
 - __cell_plane_df.csv__ contains plane measure, such as orientation, anisotropy, area, perimeter
@@ -27,39 +34,59 @@ Segmentation part generate 7 csv files, that can be populated later during the a
 </p>
 
 
-## From Prerequisite part  
-
+## Prerequisite  
 It creates two folders names "npz" and "obj_mesh" that stores numpy array of binary one cell image and ply/obj file of each cell respectively. npz file are mandatory for the analyse, while obj_mesh allows to visualise cells in 3D with Blender. All files are named after the cell id in the original image. 
 
+## Segmentation
+This part consists of analysing the labelled image in order to determine neighbouring relationship between cells; contact between two cells (i.e. face); contact between three cells (i.e. edge). 
+<p align="center">
+ <img src="doc/image/cell_decomposition.png" width="400">
+</p>
 ## Analysis
 
 ### Cell information (cell_df.csv)
-- Volume $vol_c=nb_{pixel}*voxel_{size}$
-- Coordinate of line in the middle of the cell : $mid_{line}$
-- Real distance of $mid_{line}$ : $D_r$
-- Short distance of $mid_{line}$ : $D_s$
-- Curvature index $1-(D_s/D_r)$
-
+<table>
+<tr>
+<td>
+<li>Volume $vol_c=nb_{pixel}*voxel_{size}$</li>
+<li>Coordinate of line in the middle of the cell : $mid_{line}$</li>
+<li>Real distance of $mid_{line}$ : $D_r$</li>
+<li>Short distance of $mid_{line}$ : $D_s$</li>
+<li>Curvature index $1-(D_s/D_r)$</li>
+</td>
+<td>
 <p align="center">
  <img src="doc/image/cell.png" width="400">
 </p>
+</td>
+</tr>
+</table>
+
 
 ### Cell plane information (cell_plane.csv)
+<table>
+<tr>
+<td>
 Plane measure :
-- Anisotropy $major/minor$
-- Orientation $\alpha = arctan2(y_orient/x_orient)$
-- Area
-- Perimeter
-
+<li>Anisotropy $major/minor$</li>
+<li>Orientation $\alpha = arctan2(y_orient/x_orient)$</li>
+<li>Area</li>
+<li>Perimeter</li>
+</td>
+<td>
 <p align="center">
  <img src="doc/image/cell_plane.png" width="400">
 </p>
+</td>
+</tr>
+</table>
 
 ### Edge information (edge_df.csv)
 - Real distance $D_r$
 - Short distance $D_s$
 - Curvature index $1-(D_s/D_r)$
-<!--
+
+<!-- 
 - Rotation angle $A_{rot}$
   * Cell centre as reference, choose xy coordinate as the same z plane as the edge coordinate
   * Value is more or less approximate depending of the cell orientation compare to z axis, but it will be fix soon
@@ -75,20 +102,46 @@ Plane measure :
  <img src="doc/image/twist.png" width="400">
 </p>
 -->
-### Face information (face_df.csv)
-- Only lateral face (coloured face in scheme)
-- id of cell1 & cell2
-- id of edge1 & edge2
-- Centre of the face
-- Width
-- Angles (reference: centre of the face)
 
+### Face information (face_df.csv)
+<table>
+<tr>
+<td>
+:warning: Only lateral face (coloured face in scheme)  
+<li>id of cell1 & cell2</li>
+<li>id of edge1 & edge2</li>
+<li>Centre of the face</li>
+<li>Width</li>
+<li>Angles (reference: centre of the face)</li>
+</td>
+<td>
 <p align="center">
  <img src="doc/image/face.png" width="400">
 </p>
-
+</td>
+</tr>
+</table>
 
 
 ## Install 
 
 See [INSTALL.md](INSTALL.md) for a step by step install. 
+
+<!--
+## Graphical user interface
+There is a graphical interface in progress. You can try it by running notebook [GUI.ipynb](https://github.com/sophietheis/Zebrafish-Muscle/blob/main/notebooks/GUI.ipynb).
+A graphical user interface is available to perform the analysis.  
+Be aware that analysis takes time.  
+Prerequisite are necessary to perform the analysis. It performs 3D distance mapping EDT algorithm to find the middle of the cell (this can also be perform with an imageJ script), and save one binary image per cell to speed up analysis.
+
+There are two ways of launching the GUI : 
+- run [GUI.ipynb](https://github.com/sophietheis/Zebrafish-Muscle/blob/main/notebooks/GUI.ipynb) notebook
+- run in command line `python CellSeg/export_gui.py`
+-->
+
+
+## Troubleshooting
+Kernel crash due to lack of memory: reduce the number of core used for parallelized task. 
+
+## Roadmap
+- Add GUI with python or as a Napari plugin
