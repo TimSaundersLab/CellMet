@@ -42,6 +42,7 @@ This part consists of analysing the labelled image in order to determine neighbo
 <p align="center">
  <img src="doc/image/cell_decomposition.png" width="400">
 </p>
+
 ## Analysis
 
 ### Cell information (cell_df.csv)
@@ -56,7 +57,7 @@ This part consists of analysing the labelled image in order to determine neighbo
 </td>
 <td>
 <p align="center">
- <img src="doc/image/cell.png" width="400">
+ <img src="doc/image/cell.png" width="200">
 </p>
 </td>
 </tr>
@@ -75,7 +76,7 @@ Plane measure :
 </td>
 <td>
 <p align="center">
- <img src="doc/image/cell_plane.png" width="400">
+ <img src="doc/image/cell_plane.png" width="200">
 </p>
 </td>
 </tr>
@@ -99,7 +100,7 @@ Plane measure :
 - Measure cell twist ( <span style="color:orange">!!!</span> All edges are used to do the average, but they don't have the same length. Maybe we need to weigh values)
 
 <p align="center">
- <img src="doc/image/twist.png" width="400">
+ <img src="doc/image/twist.png" width="200">
 </p>
 -->
 
@@ -116,7 +117,7 @@ Plane measure :
 </td>
 <td>
 <p align="center">
- <img src="doc/image/face.png" width="400">
+ <img src="doc/image/face.png" width="200">
 </p>
 </td>
 </tr>
