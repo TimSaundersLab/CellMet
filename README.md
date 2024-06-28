@@ -13,15 +13,27 @@ This code is made to analyse cell shape from 3D labeled image. It is divide in t
 
 There is a Python API to allow user to integrate CellSeg into your custom workflow.
 
-## Input/output 
+## Input/Output and datas organisation
 ### Input
 In order to be able to use this project. You first need to segment you image using CellPose (or any other software that gives 3D label image). You need to be satisfied by your label image, since there is no manual correction (only filter can be apply to remove cells that has a volume below a threshold for example).  
 Then, you can perform 3D cell segmentation with CellSeg. 
 
-### Output
-You can generate ply/obj file for each cells.
-Segmentation part generate 7 csv files, that can be populated later during the analysis part.
-- __cell_plane_df.csv__ contains measure relative to the cell, such as volume, number of neighbours, orientation, curvature
+### Output and datas organisation
+You can generate ply/obj file for each cells.  
+<table>
+<tr>
+<td  width="500">
+Datas are organised as half-edge structures. The vertex, edge, face and cell tables are interconnected to represent and navigate through the mesh's elements. 
+</td>
+<td >
+<p align="center">
+<img width="300" alt="image" src="https://github.com/TimSaundersLab/CellSeg/assets/17041165/ee0a6baf-7f74-4ab4-b774-4e394f9d3d36">
+</p>
+</td>
+</tr>
+</table>
+We generate 7 csv files, that can be populated later during the analysis part.
+- __cell_df.csv__ contains measure relative to the cell, such as volume, number of neighbours, orientation, curvature
 - __cell_plane_df.csv__ contains plane measure, such as orientation, anisotropy, area, perimeter
 - __edge_df.csv__ contains measure relative to the edge such as length (real & shortest), curvature, the 3 connected cells
 - __edge_pixel_df.csv__ contains pixels coordinates of each edge and the 3 connected cells
