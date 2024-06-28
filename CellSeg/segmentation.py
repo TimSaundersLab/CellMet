@@ -76,7 +76,7 @@ class Segmentation:
             delayed_call = [
                 joblib.delayed(save_unique_cell)(self, c_id)
                 for c_id in self.unique_id_cells]
-            joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+            joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
 
         # save mesh file
         if save_mesh:

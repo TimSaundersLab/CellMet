@@ -77,3 +77,35 @@ def str_to_array(string):
                      else float(re.sub('[^.\-\d]', '', x.split('e-')[0]))*float(re.sub('[^.\-\d]', '', x.split('e-')[-1]))
                      for x in np.array(str(string).split(" "))
                      if ((x != "...") and (x != "") and (re.sub('[^.\-\d]', '', x) !=""))])
+
+
+def reduce_label_size(image):
+    """
+    Reduce label values in order to reduce pixel size and the size of the image.
+
+    Parameters
+    ----------
+    image: np.array
+
+    Returns
+    -------
+    image: np.array with the new label
+    bits_size: depth of the pixel size
+    """
+
+    unique_label = np.unique(image)
+
+    if len(unique_label) < 2 ** 8:
+        bits_size = np.uint8
+    elif len(unique_label) < 2 ** 16:
+        bits_size = np.uint16
+    else:
+        bits_size = np.uint32
+
+    cpt = 0
+    for ul in unique_label:
+        if ul != 0:
+            image = np.putmask(image, image == ul, cpt)
+        cpt += 1
+
+    return image, bits_size
