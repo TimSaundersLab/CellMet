@@ -8,3 +8,9 @@ notebooks/.ipynb_checkpoints/
 CellSeg.egg-info/
 
 notebooks/*/*.png
+
+*.tif
+
+*.npz
+
+*.csv

@@ -26,6 +26,7 @@ dependencies:
   - os
   - sparse
   - networkx
+  - tqdm
   #- vispy
   #- zarr
   #- quantities

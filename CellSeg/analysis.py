@@ -73,7 +73,10 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     if parallelized:
         delayed_call = [joblib.delayed(sc_analysis_parallel)(seg, int(c_id), degree_convert) for c_id in
                         seg.unique_id_cells]
-        res = joblib.Parallel(n_jobs=seg.nb_core)(delayed_call)
+        # res = joblib.Parallel(n_jobs=seg.nb_core)(delayed_call)
+        with csutils.tqdm_joblib(desc="Cell analysis", total=len(seg.unique_id_cells)) as progress_bar:
+            res = joblib.Parallel(n_jobs=seg.nb_core, prefer="threads")(delayed_call)
+
         for cell_out, cell_plane_out in res:
             for k in cell_out.keys():
                 cell_df.loc[cell_df[cell_df["id_im"]==cell_out.get("id_im")].index[0], k] = cell_out.get(k)

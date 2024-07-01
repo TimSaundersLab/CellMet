@@ -1,6 +1,7 @@
 import os
 import sparse
 import joblib
+from tqdm.auto import tqdm
 
 import numpy as np
 import pandas as pd
@@ -69,14 +70,16 @@ class Segmentation:
             list_dir = os.listdir(self.storage_path + d)
             if len(list_dir) > 0:
                 if not overwrite:
-                    print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
-                    # return
+                    if (d=="obj_mesh") and (save_mesh):
+                        print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
         list_dir = os.listdir(self.storage_path + "npz")
         if overwrite or (len(list_dir)==0):
             delayed_call = [
                 joblib.delayed(save_unique_cell)(self, c_id)
                 for c_id in self.unique_id_cells]
-            joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
+            # joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
+            with csutils.tqdm_joblib(desc="Save NPZ", total=len(self.unique_id_cells)) as progress_bar:
+                joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
 
         # save mesh file
         if save_mesh:
@@ -90,7 +93,9 @@ class Segmentation:
                                                            meshtype=meshtype,
                                                            path=os.path.join(self.storage_path, "obj_mesh"))
                 for c_id in self.unique_id_cells]
-            joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+            # joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+            with csutils.tqdm_joblib(desc="Save mesh", total=len(self.unique_id_cells)) as progress_bar:
+                joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
 
     def all_segmentation(self):
         self.cell_segmentation()
@@ -151,7 +156,9 @@ class Segmentation:
                               ]
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
-        for c_id in self.unique_id_cells:
+        # for c_id in self.unique_id_cells:
+        for i in tqdm(range(len(self.unique_id_cells)), desc="Cell", leave=True):
+            c_id = self.unique_id_cells[i]
             c_id = int(c_id)
             # open image
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
@@ -215,8 +222,9 @@ class Segmentation:
                         ]
         edge_df = pd.DataFrame(columns=edge_columns)
 
-        for c_id in self.unique_id_cells:
-            print(c_id)
+        # for c_id in self.unique_id_cells:
+        for i in tqdm(range(len(self.unique_id_cells)), desc="Cell", leave=True):
+            c_id = self.unique_id_cells[i]
             # step 1
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell1_dil = sp_mat.todense()
@@ -232,7 +240,10 @@ class Segmentation:
                 joblib.delayed(edge_detection)(self, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_cell1_dil,
                                                cb, cc)
                 for cb, cc in cell_combi]
-            res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+            # res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+            with csutils.tqdm_joblib(desc="Edge segmentation", total=len(cell_combi)) as progress_bar:
+                res = joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
+
             res = [(e_pixel, e_dict) for e_pixel, e_dict in res if e_pixel is not None]
             for e_pixel, e_dict in res:
                 edge_pixel_df = pd.concat([df for df in [edge_pixel_df, e_pixel] if not df.empty],
@@ -241,6 +252,7 @@ class Segmentation:
 
             edge_df.to_csv(os.path.join(self.storage_path, "edge_df.csv"))
             edge_pixel_df.to_csv(os.path.join(self.storage_path, "edge_pixel_df.csv"))
+
 
     def face_segmentation(self):
         """
@@ -264,7 +276,9 @@ class Segmentation:
                                                    "x_e1_mean", "y_e1_mean", "z_e1_mean",
                                                    "x_e2_mean", "y_e2_mean", "z_e2_mean",
                                                    "x_mid", "y_mid", "z_mid", ])
-        for c_id in self.unique_id_cells:
+        # for c_id in self.unique_id_cells:
+        for i in tqdm(range(len(self.unique_id_cells)), desc="Cell", leave=True):
+            c_id = self.unique_id_cells[i]
             # open file
             sp_mat = sparse.load_npz(os.path.join(self.storage_path, "npz/" + str(c_id) + ".npz"))
             img_cell_dil = sp_mat.todense()
@@ -281,7 +295,10 @@ class Segmentation:
                                                    face_edge_pixel_df.columns, edge_pixel_df
                                                    )
                     for c_op_index in opp_cell.keys()]
-                res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+                # res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
+                with csutils.tqdm_joblib(desc="Face segmentation", total=len(opp_cell.keys())) as progress_bar:
+                    res = joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
+
                 res = [(f_edge_pixel, f_pixel, f_dict) for f_edge_pixel, f_pixel, f_dict in res if f_pixel is not None]
                 for f_edge_pixel, f_pixel, f_dict in res:
                     face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_edge_pixel] if not df.empty],
