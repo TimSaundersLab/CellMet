@@ -187,9 +187,9 @@ class Segmentation:
             cell_plane_df = pd.concat([df for df in [cell_plane_df, c_p_info] if not df.empty],
                                       ignore_index=True)
 
-        # Save dataframe
-        cell_df.to_csv(os.path.join(self.storage_path, "cell_df.csv"))
-        cell_plane_df.to_csv(os.path.join(self.storage_path, "cell_plane_df.csv"))
+            # Save dataframe
+            cell_df.to_csv(os.path.join(self.storage_path, "cell_df.csv"))
+            cell_plane_df.to_csv(os.path.join(self.storage_path, "cell_plane_df.csv"))
 
     def edge_segmentation(self):
         """
@@ -290,10 +290,10 @@ class Segmentation:
                                               ignore_index=True)
                     face_df.loc[len(face_df)] = f_dict
 
-        face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
-        face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
+            face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
+            face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
+            face_edge_pixel_df.to_csv(os.path.join(self.storage_path, "face_edge_pixel_df.csv"))
         face_pixel_df.to_csv(os.path.join(self.storage_path, "face_pixel_df.csv"))
-        face_edge_pixel_df.to_csv(os.path.join(self.storage_path, "face_edge_pixel_df.csv"))
 
 
 def find_all_neighbours(sub_edges):
