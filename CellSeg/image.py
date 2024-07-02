@@ -39,7 +39,7 @@ def get_unique_id_in_image(image, background_value=0):
     return id_cells
 
 
-def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0):
+def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0, by_plane=False):
     """
     Find cell neighbours id of img_cell inside img_seg.
     Parameters
@@ -55,8 +55,23 @@ def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0):
     img_multi = np.multiply(img_seg, img_cell_dil)
     id_unique = pd.unique(img_multi.flatten())
     id_unique = np.delete(id_unique, np.where(id_unique == background_value))
-    return id_unique
 
+    if by_plane :
+        nb_neighbors_plane = []
+        for z in range(img_multi.shape[0]):
+            id_unique_plane = pd.unique(img_multi[z].flatten())
+            id_unique_plane = np.delete(id_unique_plane, np.where(id_unique_plane == 0))
+            if len(id_unique_plane)==0:
+                nb_neighbors_plane.append(np.nan)
+            else:
+                nb_neighbors_plane.append(len(id_unique_plane))
+
+        # remove all np.nan
+        nb_neighbors_plane = np.array(nb_neighbors_plane)[~np.isnan(nb_neighbors_plane)]
+
+        return id_unique, nb_neighbors_plane
+    else:
+        return id_unique, None
 
 def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     """

@@ -117,7 +117,7 @@ class Segmentation:
 
             # measure nb neighbours
             neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
-            neighbours_id = np.delete(neighbours_id, np.where(c_id == neighbours_id))
+            neighbours_id, _ = np.delete(neighbours_id, np.where(c_id == neighbours_id), by_plane=False)
             # Populate cell dataframe
             cell_df.loc[len(cell_df)] = {"id_im": int(c_id),
                                          "nb_neighbor": len(neighbours_id),
@@ -153,6 +153,7 @@ class Segmentation:
                               "x_center",
                               "y_center",
                               "z_center",
+                              "nb_neighbor"
                               ]
         cell_plane_df = pd.DataFrame(columns=cell_plane_columns)
 
@@ -169,7 +170,7 @@ class Segmentation:
             data_ = csimage.find_cell_axis_center(img_cell, self.pixel_size, resize_image=True)
 
             # measure nb neighbours
-            neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
+            neighbours_id, nb_neighbors_plane = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image, by_plane=True)
 
             # Get center of the cell
             sparce_cell = sparse.COO.from_numpy(img_cell)
@@ -187,6 +188,7 @@ class Segmentation:
                                               data_["x_center"].to_numpy(),
                                               data_["y_center"].to_numpy(),
                                               data_["z_center"].to_numpy(),
+                                              nb_neighbors_plane.T,
                                               ]).T,
                                     columns=cell_plane_columns)
 
@@ -231,7 +233,7 @@ class Segmentation:
 
             img_cell1_dil[img_cell1_dil == 2] = 1
 
-            neighbours_id = csimage.find_neighbours_cell_id(img_cell1_dil, self.label_image)
+            neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell1_dil, self.label_image, by_plane=False)
 
             cell_combi = csutils.make_all_list_combination(np.delete(neighbours_id, np.where(c_id == neighbours_id)),
                                                            2)
