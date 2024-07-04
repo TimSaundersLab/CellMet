@@ -14,3 +14,7 @@ notebooks/*/*.png
 *.npz
 
 *.csv
+
+*.eps
+
+CellSeg/__pycache__/
