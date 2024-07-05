@@ -36,10 +36,13 @@ def tqdm_joblib(*args, **kwargs):
         joblib.parallel.BatchCompletionCallBack = old_batch_callback
         tqdm_object.close()
 
-def generate_struct_dil():
+def generate_struct_dil(dim=3):
     struct_dil = ndi.generate_binary_structure(3, 2)
     struct_dil[0] = np.repeat(False, 9).reshape(3, 3)
     struct_dil[2] = np.repeat(False, 9).reshape(3, 3)
+    if dim == 2:
+        struct_dil = struct_dil[1]
+
     return struct_dil
 
 def make_all_list_combination(l_value, n):
