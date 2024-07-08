@@ -115,7 +115,7 @@ class Segmentation2D(Segmentation):
 
             img_cell1_dil[img_cell1_dil == 2] = 1
 
-            neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell1_dil, self.label_image, by_plane=False)
+            neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell1_dil, self.label_image, by_plane=False, background_value=-1)
 
             cell_combi = csutils.make_all_list_combination(np.delete(neighbours_id, np.where(c_id == neighbours_id)),
                                                            2)
@@ -124,16 +124,18 @@ class Segmentation2D(Segmentation):
                 joblib.delayed(vert_detection_2d)(self, cell_df, c_id, img_cell1_dil,
                                                cb, cc)
                 for cb, cc in cell_combi]
-            # res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
             with csutils.tqdm_joblib(desc="Vert segmentation", total=len(cell_combi)) as progress_bar:
                 res = joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
 
-#             res = [(e_dict) for e_pixel, e_dict in res if e_pixel is not None]
             for e_dict in res:
                 vert_df.loc[len(vert_df)] = e_dict
 
             vert_df.to_csv(os.path.join(self.storage_path, "vert_df.csv"))
-
+        vert_df.dropna(inplace=True)
+        vert_df[["id_im_1", "id_im_2", "id_im_3"]] = np.sort(vert_df[["id_im_1", "id_im_2", "id_im_3"]])
+        vert_df.drop_duplicates(["id_im_1", "id_im_2", "id_im_3"], inplace=True)
+        vert_df.reset_index(inplace=True, drop=True)
+        vert_df.to_csv(os.path.join(self.storage_path, "vert_df.csv"))
 
 
     def edge_segmentation(self):
@@ -160,20 +162,23 @@ class Segmentation2D(Segmentation):
             img_cell_dil = sp_mat.todense()
             img_cell_dil[img_cell_dil == 2] = 1
 
-            sub_edges = vert_df[vert_df['id_im_1'] == c_id]
+            neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image, by_plane=False,
+                                                               background_value=-1)
+            neighbours_id = np.delete(neighbours_id, np.where(neighbours_id == c_id))
+            # sub_edges = vert_df[vert_df['id_im_1'] == c_id]
 
-            ordered_neighbours, opp_cell = find_all_neighbours(sub_edges)
+            # ordered_neighbours, opp_cell = find_all_neighbours(sub_edges)
 
-            if len(ordered_neighbours) != 0:
+            if len(neighbours_id) != 0:
                 delayed_call = [
-                    joblib.delayed(edge_detection_2d)(self.storage_path, c_id, c_op_index, opp_cell,
+                    joblib.delayed(edge_detection_2d)(self.storage_path, c_id, c_op_index, "",
                                                       img_cell_dil,
-                                                   sub_edges, edge_df.columns, edge_pixel_df.columns,
-                                                   edge_pixel_df, vert_df
+                                                   "", edge_df.columns, edge_pixel_df.columns,
+                                                   edge_pixel_df, vert_df, self
                                                    )
-                    for c_op_index in opp_cell.keys()]
+                    for c_op_index in neighbours_id]
                 # res = joblib.Parallel(n_jobs=self.nb_core)(delayed_call)
-                with csutils.tqdm_joblib(desc="Face segmentation", total=len(opp_cell.keys())) as progress_bar:
+                with csutils.tqdm_joblib(desc="Face segmentation", total=len(neighbours_id)) as progress_bar:
                     res = joblib.Parallel(n_jobs=self.nb_core, prefer="threads")(delayed_call)
 
                 res = [(f_pixel, f_dict) for f_pixel, f_dict in res if f_pixel is not None]
@@ -229,10 +234,10 @@ def vert_detection_2d(seg, cell_df, c_id, img_cell1_dil, cb, cc ):
 
 
 def edge_detection_2d(path, c_id, c_op_index, opp_cell, img_cell_dil, sub_edges, edge_columns, edge_pixel_columns,
-                   edge_pixel_df, vert_df):
+                   edge_pixel_df, vert_df, seg):
 
-    c_op, a, b, c, d = opp_cell[c_op_index]
-
+    # c_op, a, b, c, d = opp_cell[c_op_index]
+    c_op = c_op_index
     sp_mat = sparse.load_npz(os.path.join(path, "npz/" + str(int(c_op)) + ".npz"))
     img_cell_dil2 = sp_mat.todense()
     img_cell_dil2[img_cell_dil2 == 2] = 1
@@ -241,7 +246,52 @@ def edge_detection_2d(path, c_id, c_op_index, opp_cell, img_cell_dil, sub_edges,
     sparce_edge = sparse.COO.from_numpy(img_edge)
     y0, x0 = sparce_edge.coords
 
-
+    img_edge_dil = ndi.binary_dilation(img_edge, structure=seg.struct_dil)
+    img_cell_n = np.multiply(img_edge_dil, seg.label_image)
+    cell_id_n = pd.unique(img_cell_n.flatten())
+    cell_id_n = np.delete(cell_id_n, np.where(cell_id_n == c_id))
+    cell_id_n = np.delete(cell_id_n, np.where(cell_id_n == c_op))
+    # print(cell_id_n)
+    if len(cell_id_n)>2:
+        print(c_id, c_op, cell_id_n)
+        cpt=0
+        for c in cell_id_n:
+            c1, c2, c3 = np.sort([c_id, c_op, c])
+            if len(vert_df[((vert_df["id_im_1"]==c1) & (vert_df["id_im_2"]==c2) & (vert_df["id_im_3"]==c3))])>0:
+                if cpt==0:
+                    a = c
+                    cpt+=1
+                elif cpt==1:
+                    b=c
+                    cpt+=1
+                # else :
+                #     c1, c2, c3 = np.sort([c_id, c_op, a])
+                #     c4, c5, c6 = np.sort([c_id, c_op, c])
+                #     c7, c8, c9 = np.sort([c_id, c_op, b])
+                #     if not in_circle(vert_df[(vert_df["id_im_1"]==c1) & (vert_df["id_im_2"]==c2) & (vert_df["id_im_3"]==c3)]["x"].to_numpy()[0],
+                #               vert_df[(vert_df["id_im_1"]==c1) & (vert_df["id_im_2"]==c2) & (vert_df["id_im_3"]==c3)]["y"].to_numpy()[0],
+                #               0.5,
+                #               vert_df[(vert_df["id_im_1"] == c4) & (vert_df["id_im_2"] == c5) & (vert_df["id_im_3"] == c6)]["x"].to_numpy()[0],
+                #               vert_df[(vert_df["id_im_1"] == c4) & (vert_df["id_im_2"] == c5) & (vert_df["id_im_3"] == c6)]["y"].to_numpy()[0],
+                #               ):
+                #         a = c
+                #
+                #     elif not in_circle(vert_df[(vert_df["id_im_1"] == c7) & (vert_df["id_im_2"] == c8) & (vert_df["id_im_3"] == c9)]["x"].to_numpy()[0],
+                #                  vert_df[(vert_df["id_im_1"] == c7) & (vert_df["id_im_2"] == c8) & (vert_df["id_im_3"] == c9)]["y"].to_numpy()[0],
+                #                  0.5,
+                #                  vert_df[(vert_df["id_im_1"] == c4) & (vert_df["id_im_2"] == c5) & (vert_df["id_im_3"] == c6)]["x"].to_numpy()[0],
+                #                  vert_df[(vert_df["id_im_1"] == c4) & (vert_df["id_im_2"] == c5) & (vert_df["id_im_3"] == c6)]["y"].to_numpy()[0],
+                #                  ):
+                #         b = c
+    elif len(cell_id_n) == 2:
+        a = cell_id_n[0]
+        b = cell_id_n[1]
+    elif len(cell_id_n)==1:
+        a = cell_id_n[0]
+        b = None
+    elif len(cell_id_n) == 0:
+        a = None
+        b = None
 
     e1 = pd.DataFrame.from_dict({
             'x': edge_pixel_df[(edge_pixel_df['id_im_1'] == c_id) &
@@ -259,17 +309,23 @@ def edge_detection_2d(path, c_id, c_op_index, opp_cell, img_cell_dil, sub_edges,
                                      ]).T,
                            columns=edge_pixel_columns)
 
-    if (a is None) or (b is None):
+    if a is None:
         v1 = None
     else:
-        v1 = vert_df[((vert_df["id_im_1"]==c_id) & (vert_df["id_im_2"]==a) & (vert_df["id_im_3"]==b)) |
-                    (vert_df["id_im_1"]==c_id) & (vert_df["id_im_2"]==b) & (vert_df["id_im_3"]==a)].index[0]
+        try:
+            c1, c2, c3 = np.sort([c_id, c_op, a])
+            v1 = vert_df[((vert_df["id_im_1"]==c1) & (vert_df["id_im_2"]==c2) & (vert_df["id_im_3"]==c3))].index[0]
+        except:
+            v1 = None
 
-    if (c is None) or (d is None):
+    if b is None:
         v2 = None
     else:
-        v2 = vert_df[((vert_df["id_im_1"]==c_id) & (vert_df["id_im_2"]==c) & (vert_df["id_im_3"]==d)) |
-                    ((vert_df["id_im_1"]==c_id) & (vert_df["id_im_2"]==d) & (vert_df["id_im_3"]==c))].index[0]
+        try:
+            c1, c2, c3 = np.sort([c_id, c_op, b])
+            v2 = vert_df[((vert_df["id_im_1"]==c1) & (vert_df["id_im_2"]==c2) & (vert_df["id_im_3"]==c3))].index[0]
+        except:
+            v2 = None
 
     f_dict = {"id_im_1": c_id,
               "id_im_2": c_op,
@@ -414,3 +470,13 @@ def measure_cell_plane_2d(img_cell, pixel_size):
         area.append(np.nan)
 
     return aniso, orientation_x, orientation_y, major, minor, area, perimeter
+
+
+def in_circle(center_x, center_y, radius, x, y):
+    """
+    center_x , center_y are the coordinate of the circle center
+    radius, is the radius of the circle
+    x,y are the coordinate of the point you want to know if it is inside the circle or not
+    """
+    square_dist = (center_x - x) ** 2 + (center_y - y) ** 2
+    return square_dist <= radius ** 2
