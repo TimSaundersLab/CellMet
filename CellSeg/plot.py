@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 import plotly.graph_objects as go
 
+from skimage.draw import line_aa
+
 def random_color(nb=100):
     """
     Generate random color map
@@ -35,5 +37,23 @@ def colored_cell(image, cell_df, column, normalize=True, normalize_max=None, bor
     for f, c in zip(cell_df["id_im"], color):
         pos = np.where(image == f)
         img_color[pos] = c
+
+    return img_color
+
+
+def aniso_cell(image, cell_df, factor=2):
+    img_color = np.zeros(image.shape)
+
+    max_aniso = cell_df['aniso'].max()
+    cell_df['norm_aniso'] = (cell_df['aniso'] / max_aniso)
+
+    startx = (cell_df['x_center'] - factor * cell_df['norm_aniso'] * cell_df['orientation_y'])
+    starty = (cell_df['y_center'] - factor * cell_df['norm_aniso'] * cell_df['orientation_x'])
+    endx = (cell_df['x_center'] + factor * cell_df['norm_aniso'] * cell_df['orientation_y'])
+    endy = (cell_df['y_center'] + factor * cell_df['norm_aniso'] * cell_df['orientation_x'])
+
+    for i in cell_df.index:
+        rr, cc, val = line_aa(int(starty[i]), int(startx[i]), int(endy[i]), int(endx[i]))
+        img_color[rr, cc] = cell_df.loc[i]['norm_aniso'] * 100
 
     return img_color

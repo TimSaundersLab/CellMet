@@ -445,8 +445,8 @@ def measure_cell_plane_2d(img_cell, pixel_size):
 
             orientation = svd[2:]
             aniso.append(s[0] / s[1])
-            orientation_x.append(orientation[0])
-            orientation_y.append(orientation[1])
+            orientation_x.append(orientation[1])
+            orientation_y.append(orientation[0])
             major.append(s[0])
             minor.append(s[1])
             perimeter.append(hull.area)
