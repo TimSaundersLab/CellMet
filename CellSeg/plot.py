@@ -40,7 +40,7 @@ def colored_cell(image, cell_df, column, normalize=True, normalize_max=None, bor
 
     return img_color
 
-
+from skimage.draw import line_aa
 def aniso_cell(image, cell_df, factor=2):
     img_color = np.zeros(image.shape)
 

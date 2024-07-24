@@ -310,6 +310,7 @@ class Segmentation:
                     face_df.loc[len(face_df)] = f_dict
 
             face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
+            face_df.reset_index(drop=True, inplace=True)
             face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
             face_edge_pixel_df.to_csv(os.path.join(self.storage_path, "face_edge_pixel_df.csv"))
         face_pixel_df.to_csv(os.path.join(self.storage_path, "face_pixel_df.csv"))
