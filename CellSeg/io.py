@@ -15,14 +15,14 @@ import numpy as np
 from . import image as csimage
 
 
-def ndarray2vtkMesh(inVertexArray, inFacesArray):
+def array2mesh(vert, face):
     """ Code inspired by https://github.com/selaux/numpy2vtk
     """
     # Handle the points & vertices:
     z_index = 0
     vtk_points = vtkPoints()
-    for p in inVertexArray:
-        z_value = p[2] if inVertexArray.shape[1] == 3 else z_index
+    for p in vert:
+        z_value = p[2] if vert.shape[1] == 3 else z_index
         vtk_points.InsertNextPoint([p[0], p[1], z_value])
     number_of_points = vtk_points.GetNumberOfPoints()
 
@@ -33,14 +33,14 @@ def ndarray2vtkMesh(inVertexArray, inFacesArray):
         vtk_vertices.InsertCellPoint(v)
 
     # Handle faces
-    number_of_polygons = inFacesArray.shape[0]
-    poly_shape = inFacesArray.shape[1]
+    number_of_polygons = face.shape[0]
+    poly_shape = face.shape[1]
     vtk_polygons = vtkCellArray()
     for j in range(0, number_of_polygons):
         polygon = vtkPolygon()
         polygon.GetPointIds().SetNumberOfIds(poly_shape)
         for i in range(0, poly_shape):
-            polygon.GetPointIds().SetId(i, inFacesArray[j, i])
+            polygon.GetPointIds().SetId(i, face[j, i])
         vtk_polygons.InsertNextCell(polygon)
 
     # Assemble the vtkPolyData from the points, vertices and faces
@@ -52,16 +52,16 @@ def ndarray2vtkMesh(inVertexArray, inFacesArray):
     return poly_data
 
 
-def _getLargestCC(segmentation):
-    """Legacy version, substitute by getLargestCC"""
+def _get_largest_cc(segmentation):
+    """Legacy version, substitute by getLargestCC
+    Returns largest connected component """
     """Returns largest connected components"""
     # ~2x faster than clean_object(obj)
-
     # relabel connected components
     labels = measure.label(segmentation)
     assert (labels.max() != 0)  # assume at least 1 CC
-    largestCC = labels == np.argmax(np.bincount(labels.flat)[1:]) + 1
-    return largestCC
+    largest_cc = labels == np.argmax(np.bincount(labels.flat)[1:]) + 1
+    return largest_cc
 
 
 def label2vtk(segmentation, label, step_size=1):
@@ -77,7 +77,7 @@ def label2vtk(segmentation, label, step_size=1):
         return None
 
     # Get the largest connected component
-    obj = _getLargestCC(obj)
+    obj = _get_largest_cc(obj)
     if obj is None:
         return None
 
@@ -87,12 +87,12 @@ def label2vtk(segmentation, label, step_size=1):
     # Generate a mesh using the marching cubes algorithm.
     vertx, faces, normals, _ = measure.marching_cubes(obj, 0, step_size=step_size)
     # Convert the vertices and faces in a VTK polyData
-    vtkPoly = ndarray2vtkMesh(vertx, faces.astype(int))
-    return vtkPoly
+    vtk_poly = array2mesh(vertx, faces.astype(int))
+    return vtk_poly
 
 def make_mesh_file_para(image, cell_id, meshtype="ply", step_size=1, path=""):
-    vtkPoly = label2vtk(image, cell_id, step_size)
-    write_mesh(vtkPoly, meshtype, os.path.join(path, str(cell_id)))
+    vtk_poly = label2vtk(image, cell_id, step_size)
+    write_mesh(vtk_poly, meshtype, os.path.join(path, str(cell_id)))
 
 def make_mesh_file(image, id_unique_cell=None, meshtype="ply", step_size=1, path=""):
     """
@@ -112,11 +112,11 @@ def make_mesh_file(image, id_unique_cell=None, meshtype="ply", step_size=1, path
         id_unique_cell = csimage.get_unique_id_in_image(image)
 
     for i in id_unique_cell:
-        vtkPoly = label2vtk(image, i, step_size)
-        write_mesh(vtkPoly, meshtype, os.path.join(path, str(i)))
+        vtk_poly = label2vtk(image, i, step_size)
+        write_mesh(vtk_poly, meshtype, os.path.join(path, str(i)))
 
 
-def write_mesh(vtkPoly, meshtype='ply', savepath=None):
+def write_mesh(vtk_poly, meshtype='ply', savepath=None):
     """
     meshtype can be 'ply' or 'obj'
     """
@@ -128,12 +128,12 @@ def write_mesh(vtkPoly, meshtype='ply', savepath=None):
         print("meshtype is wrong. Choose between ply and obj")
         return
 
-    writer.SetInputData(vtkPoly)
+    writer.SetInputData(vtk_poly)
     writer.SetFileName(savepath + '.' + meshtype)
     writer.Write()
 
 
-def write_tiff(image, filename, path="", pixel_size=None, type="uint8"):
+def write_tiff(image, filename, path="", pixel_size=None, _type="uint8"):
     """
     Save numpy array as tiff file
 
@@ -151,7 +151,7 @@ def write_tiff(image, filename, path="", pixel_size=None, type="uint8"):
         pixel_size = dict(x_size=1, y_size=1, z_size=1)
     if len(image.shape) == 3:
         tifffile.imwrite(os.path.join(path, filename + ".tif"),
-                         image.astype(type),
+                         image.astype(_type),
                          imagej=True,
                          resolution=(1 / pixel_size['y_size'], 1 / pixel_size['x_size']),
                          metadata={
@@ -165,7 +165,7 @@ def write_tiff(image, filename, path="", pixel_size=None, type="uint8"):
 
     elif len(image.shape) == 2:
         tifffile.imwrite(os.path.join(path, filename + ".tif"),
-                         image.astype(type),
+                         image.astype(_type),
                          imagej=True,
                          resolution=(1 / pixel_size['y_size'], 1 / pixel_size['x_size']),
                          metadata={

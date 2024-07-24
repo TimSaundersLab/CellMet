@@ -70,7 +70,7 @@ class Segmentation:
             list_dir = os.listdir(self.storage_path + d)
             if len(list_dir) > 0:
                 if not overwrite:
-                    if (d=="obj_mesh") and (save_mesh):
+                    if (d=="obj_mesh") and save_mesh:
                         print("This folder " + d + " is not empty, \nIf you want to save file here, turn overwrite to True")
         list_dir = os.listdir(self.storage_path + "npz")
         if overwrite or (len(list_dir)==0):
@@ -116,8 +116,8 @@ class Segmentation:
             img_cell_dil[img_cell_dil == 2] = 1
 
             # measure nb neighbours
-            neighbours_id = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image)
-            neighbours_id, _ = np.delete(neighbours_id, np.where(c_id == neighbours_id), by_plane=False)
+            neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell_dil, self.label_image, by_plane=False)
+            neighbours_id = np.delete(neighbours_id, np.where(c_id == neighbours_id))
             # Populate cell dataframe
             cell_df.loc[len(cell_df)] = {"id_im": int(c_id),
                                          "nb_neighbor": len(neighbours_id),

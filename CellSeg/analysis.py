@@ -17,6 +17,7 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     Analyse cell shape that only require one cell.
     :param seg: Segmentation object
     :param parallelized: bool to parallelized analysis
+    :param degree_convert: bool to convert angle measure in degree
     :return:
     """
     cell_columns = ["id_im",
