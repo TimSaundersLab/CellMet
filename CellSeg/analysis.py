@@ -90,6 +90,8 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
                 cell_df.loc[cell_df[cell_df["id_im"] == res[0].get("id_im")].index[0], k] = res[0].get(k)
             cell_plane_df = pd.concat([cell_plane_df, pd.DataFrame(res[1], columns=cell_plane_columns)], ignore_index=True)
 
+    # 1 for a sphere
+    cell_df['sphericity'] = (np.pi ** (1 / 3) * (6 * cell_df["volume"]) ** (2 / 3)) / cell_df["area"]
     # Save dataframe
     cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
     cell_plane_df.to_csv(os.path.join(seg.storage_path, "cell_plane_df.csv"))

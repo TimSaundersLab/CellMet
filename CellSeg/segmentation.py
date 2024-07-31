@@ -598,3 +598,29 @@ def face_detection(path, c_id, c_op_index, opp_cell, img_cell_dil, sub_edges, fa
     #                               ignore_index=True)
 
     return f_edge_pixel, f_pixel, f_dict
+
+
+import sparse
+from skimage import morphology
+def create_skeleton(seg):
+    binary_image = np.zeros((seg.label_image.shape))
+
+    for c_id in seg.unique_id_cells:
+        sp_mat = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+        img_cell1_dil = sp_mat.todense()
+
+        img_cell1_dil[img_cell1_dil == 2] = 1
+
+        neighbours_id, _ = csimage.find_neighbours_cell_id(img_cell1_dil, seg.label_image, by_plane=False,
+                                                   background_value=-1)
+        neighbours_id = np.delete(neighbours_id, np.where(c_id == neighbours_id))
+        for c_nb in neighbours_id:
+            if c_nb !=0:
+                sp_mat = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_nb) + ".npz"))
+                img_cell2_dil = sp_mat.todense()
+                img_cell2_dil[img_cell2_dil == 2] = 1
+                img_edge = np.multiply(img_cell1_dil, img_cell2_dil)
+                pos = np.where(img_edge > 0)
+                binary_image[pos] = 1
+    # binary_image = morphology.skeletonize(binary_image)
+    return binary_image

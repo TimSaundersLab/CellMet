@@ -174,3 +174,4 @@ def write_tiff(image, filename, path="", pixel_size=None, _type="uint8"):
                              'hyperstack': True,
                              'channels': 1,
                          })
+

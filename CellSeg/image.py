@@ -56,12 +56,12 @@ def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0, by_plane=
     id_unique = pd.unique(img_multi.flatten())
     id_unique = np.delete(id_unique, np.where(id_unique == background_value))
 
-    if by_plane :
+    if by_plane:
         nb_neighbors_plane = []
         for z in range(img_multi.shape[0]):
             id_unique_plane = pd.unique(img_multi[z].flatten())
             id_unique_plane = np.delete(id_unique_plane, np.where(id_unique_plane == 0))
-            if len(id_unique_plane)==0:
+            if len(id_unique_plane) == 0:
                 nb_neighbors_plane.append(np.nan)
             else:
                 nb_neighbors_plane.append(len(id_unique_plane))
@@ -72,6 +72,7 @@ def find_neighbours_cell_id(img_cell_dil, img_seg, background_value=0, by_plane=
         return id_unique, nb_neighbors_plane
     else:
         return id_unique, None
+
 
 def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     """
@@ -125,10 +126,36 @@ def find_cell_axis_center(img_cell, pixel_size, resize_image=True):
     result = pd.DataFrame(data=[np.array(x_c),
                                 np.array(y_c),
                                 np.array(z_c),
-                                np.array(x_c)*pixel_size["x_size"],
-                                np.array(y_c)*pixel_size["y_size"],
-                                np.array(z_c)*pixel_size["z_size"],
+                                np.array(x_c) * pixel_size["x_size"],
+                                np.array(y_c) * pixel_size["y_size"],
+                                np.array(z_c) * pixel_size["z_size"],
                                 ]).T
     result.columns = ["x_center", "y_center", "z_center",
                       "x_center_um", "y_center_um", "z_center_um"]
     return result
+
+
+def colored_image_cell(image, cell_df, column, normalize=True, normalize_max=None):
+    if column not in cell_df.columns:
+        print("This columns does not exist : " + column)
+        return
+
+    if normalize:
+        if normalize_max is None:
+            cell_df[column + '_norm'] = cell_df[column] / cell_df[column].max()
+        else:
+            cell_df[column + '_norm'] = cell_df[column] / normalize_max
+
+    colored_image = np.zeros(image.shape)
+
+    for c in cell_df.index:
+        cell_position = np.where(image == int(cell_df.loc[c]["id_im"]))
+        if normalize:
+            colored_image[cell_position] = cell_df.loc[c, column + '_norm']
+        else:
+            colored_image[cell_position] = cell_df.loc[c, column]
+
+    return colored_image
+
+
+
