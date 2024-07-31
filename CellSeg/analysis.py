@@ -105,7 +105,7 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
     img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
     data_ = csimage.find_cell_axis_center(img_cell, seg.pixel_size, resize_image=True)
     # measure nb neighbours
-    neighbours_id, nb_neighbors_plane = csimage.find_neighbours_cell_id(img_cell_dil, seg0.label_image, by_plane=True)
+    neighbours_id, nb_neighbors_plane = csimage.find_neighbours_cell_id(img_cell_dil, seg.label_image, by_plane=True)
     (a, ox, oy, maj, mi, ar, per) = measure_cell_plane(img_cell, seg.pixel_size)
 
     cell_plane_out = np.array([np.repeat(c_id, len(data_["x_center"].to_numpy())),
