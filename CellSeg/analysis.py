@@ -238,6 +238,35 @@ def face_analysis(seg: Segmentation):
     face_edge_pixel_df.to_csv(os.path.join(seg.storage_path, "face_edge_pixel_df.csv"))
 
 
+    face_df = pd.read_csv(os.path.join(seg.storage_path, "face_df.csv"),
+                          index_col="Unnamed: 0")
+    face_pixel_df = pd.read_csv(os.path.join(seg.storage_path, "face_pixel_df.csv"),
+                                     index_col="Unnamed: 0")
+    # area calculation
+    df = face_edge_pixel_df.groupby(["id_im_1", "id_im_2", "edge_1", "edge_2"])["length_um"].sum() * seg.pixel_size["z_size"]
+    df.index = df.index.set_names(["id_im_1", "id_im_2", "edge_1", "edge_2"])
+    df = df.reset_index()
+    face_df["area"] = np.nan
+    for i, val in df.iterrows():
+        f_id = face_df[((face_df["id_im_1"] == val["id_im_1"]) & (face_df["id_im_2"] == val["id_im_2"])) |
+                       (face_df["id_im_1"] == val["id_im_2"]) & (face_df["id_im_2"] == val["id_im_1"])].index
+        face_df.loc[f_id, 'area'] = val["length_um"]
+
+    # perimeter calculation
+    df = 2 * (face_edge_pixel_df.groupby(["id_im_1", "id_im_2", "edge_1", "edge_2"])["length_um"].mean() +
+              face_edge_pixel_df.groupby(["id_im_1", "id_im_2", "edge_1", "edge_2"])["length_um"].count()*seg.pixel_size["z_size"])
+    df.index = df.index.set_names(["id_im_1", "id_im_2", "edge_1", "edge_2"])
+    df = df.reset_index()
+    face_df["perimeter"] = np.nan
+    for i, val in df.iterrows():
+        f_id = face_df[((face_df["id_im_1"] == val["id_im_1"]) & (face_df["id_im_2"] == val["id_im_2"])) |
+                       (face_df["id_im_1"] == val["id_im_2"]) & (face_df["id_im_2"] == val["id_im_1"])].index
+        face_df.loc[f_id, 'perimeter'] = val["length_um"]
+
+    face_df.to_csv(os.path.join(seg.storage_path, "face_df.csv"))
+
+
+
 # def calculate_cell_orientation(cell_df, cell_plane_df, degree_convert=True):
 #     start = []
 #     end = []

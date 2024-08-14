@@ -303,8 +303,9 @@ class Segmentation:
 
                 res = [(f_edge_pixel, f_pixel, f_dict) for f_edge_pixel, f_pixel, f_dict in res if f_pixel is not None]
                 for f_edge_pixel, f_pixel, f_dict in res:
-                    face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_edge_pixel] if not df.empty],
-                                                   ignore_index=True)
+                    # face_edge_pixel_df = pd.concat([df for df in [face_edge_pixel_df, f_edge_pixel] if not df.empty],
+                    #                                ignore_index=True)
+                    face_edge_pixel_df = pd .concat([face_edge_pixel_df, f_edge_pixel], ignore_index=True)
                     face_pixel_df = pd.concat([df for df in [face_pixel_df, f_pixel] if not df.empty],
                                               ignore_index=True)
                     face_df.loc[len(face_df)] = f_dict
@@ -312,6 +313,9 @@ class Segmentation:
             face_df.drop_duplicates(["id_im_1", "id_im_2", "edge_1", "edge_2"], inplace=True)
             face_df.reset_index(drop=True, inplace=True)
             face_df.to_csv(os.path.join(self.storage_path, "face_df.csv"))
+
+            face_edge_pixel_df.dropna(subset=['id_im_1'], inplace=True)
+            face_edge_pixel_df.reset_index(drop=True, inplace=True)
             face_edge_pixel_df.to_csv(os.path.join(self.storage_path, "face_edge_pixel_df.csv"))
         face_pixel_df.to_csv(os.path.join(self.storage_path, "face_pixel_df.csv"))
 
