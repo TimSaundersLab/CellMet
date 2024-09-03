@@ -12,6 +12,23 @@ from . import utils as csutils
 from . import image as csimage
 
 
+def simplified_cell_analysis(seg):
+    """
+    Only measure the volume to filter the segmentation
+    :param seg:
+    :return:
+    """
+    cell_df = pd.DataFrame(columns=["volume"])
+    cell_df["id_im"] = seg.unique_id_cells
+    for c_id in seg.unique_id_cells:
+        sparse_cell = sparse.load_npz(os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+        img_cell_dil = sparse_cell.todense()
+        img_cell_dil[img_cell_dil == 2] = 1
+        img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
+        volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
+        cell_df.loc[cell_df[cell_df["id_im"] == c_id].index, "volume"] = volume
+        cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
+
 def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True):
     """
     Analyse cell shape that only require one cell.

@@ -139,7 +139,7 @@ def reduce_label_size(image):
     cpt = 0
     for ul in unique_label:
         if ul != 0:
-            image = np.putmask(image, image == ul, cpt)
+            image = np.putmask(np.array(image), image == ul, cpt)
         cpt += 1
 
     return image, bits_size
