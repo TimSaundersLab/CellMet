@@ -11,9 +11,9 @@ DISTNAME = 'CellSeg'
 DESCRIPTION = '3D cell segmentation from label image'
 MAINTAINER = 'Sophie THEIS'
 MAINTAINER_EMAIL = 'sophiets13@gmail.com'
-URL = 'https://github.com/sophietheis/CellSeg'
+URL = 'https://github.com/TimSaundersLab/CellSeg'
 LICENSE = 'MPL-2.0'
-DOWNLOAD_URL = 'https://github.com/sophietheis/CellSeg.git'
+DOWNLOAD_URL = 'https://github.com/TimSaundersLab/CellSeg.git'
 
 files = ['notebooks/*.*', 'data/*.*']
 
@@ -56,7 +56,7 @@ def get_version_info():
     FULLVERSION = VERSION
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
-    elif os.path.exists('CellSeg/version.py'):
+    elif os.path.exists('CellSeg/_version.py'):
         # must be a source distribution, use existing version file
         try:
             from numpy.version import git_revision as GIT_REVISION
@@ -73,7 +73,7 @@ def get_version_info():
     return FULLVERSION, GIT_REVISION
 
 
-def write_version_py(filename='CellSeg/version.py'):
+def write_version_py(filename='CellSeg/_version.py'):
     cnt = """
 # THIS FILE IS GENERATED FROM CellSeg SETUP.PY
 #

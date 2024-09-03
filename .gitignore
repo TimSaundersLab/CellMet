@@ -18,3 +18,5 @@ notebooks/*/*.png
 *.eps
 
 CellSeg/__pycache__/
+
+dist/
