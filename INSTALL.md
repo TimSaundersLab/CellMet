@@ -1,7 +1,7 @@
 ## System requirements
 Linux, Windows and Mac OS are supported for running the code. At least 8 GB of RAM is required to run the software. 32GB may be required for larger images. The software has been heavily tested on Ubuntu 22.04 and less-tested on Mac OS and Windows 10. Please open an issue if you have any problems with installation. 
 
-:warning: canda and pip are not working yet. Please use installing from source method :heavy_exclamation_mark:   
+:warning: conda and pip are not working yet. Please use installing from source method :heavy_exclamation_mark:   
 ## Installing CellSeg with conda
 
 If you have a conda environment ready:
