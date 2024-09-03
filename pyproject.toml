@@ -54,7 +54,7 @@ docs = [
 Homepage = "https://github.com/TimSaundersLab/CellSeg"
 "Bug Tracker" = "https://github.com/TimSaundersLab/CellSeg/issues"
 Discussions = "https://github.com/TimSaundersLab/CellSeg/discussions"
-Changelog = "https://gituhb.com/TimSaundersLab/CellSeg/releases"
+Changelog = "https://github.com/TimSaundersLab/CellSeg/releases"
 
 [tool.scikit-build]
 minimum-version = "0.4"
