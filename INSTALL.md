@@ -7,7 +7,7 @@ This install a cross-platform, pure python version of CellMet.
 Some advanced features are not available, namely:
 
 ```sh
-pip install CellSegAnalysis
+pip install CellMet
 ```
 
 ## Installing from source

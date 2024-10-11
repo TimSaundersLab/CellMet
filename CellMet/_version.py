@@ -3,8 +3,8 @@
 #
 short_version = '0.9.1'
 version = '0.9.1'
-full_version = '0.9.1.dev0+c75206e'
-git_revision = 'c75206eb2718cd9793b3e57de99a5513ef3d65d5'
+full_version = '0.9.1.dev0+0c83190'
+git_revision = '0c831902c22ccaba1ecec187426ef8ffdb4bff42'
 release = False
 if not release:
     version = full_version
