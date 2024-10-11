@@ -3,12 +3,12 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "CellSegAnalysis"
+name = "CellMet"
 authors = [
   { name = "Sophie Theis", email = "sophiets13@gmail.com" },
-  { name = "all CellSeg contributors"}
+  { name = "all CellMet contributors"}
 ]
-description = "CellSeg is cell segmentation shape analysis library"
+description = "CellMet is cell segmentation shape analysis library"
 readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
@@ -51,10 +51,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/TimSaundersLab/CellSeg"
-"Bug Tracker" = "https://github.com/TimSaundersLab/CellSeg/issues"
-Discussions = "https://github.com/TimSaundersLab/CellSeg/discussions"
-Changelog = "https://github.com/TimSaundersLab/CellSeg/releases"
+Homepage = "https://github.com/TimSaundersLab/CellMet"
+"Bug Tracker" = "https://github.com/TimSaundersLab/CellMet/issues"
+Discussions = "https://github.com/TimSaundersLab/CellMet/discussions"
+Changelog = "https://github.com/TimSaundersLab/CellMet/releases"
 
 [tool.scikit-build]
 minimum-version = "0.4"
@@ -62,11 +62,11 @@ metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 sdist.exclude = [".github"]
 sdist.include = [
-  "CellSeg/_version.py",
+  "CellMet/_version.py",
 ]
 
 [tool.setuptools_scm]
-write_to = "CellSeg/_version.py"
+write_to = "CellMet/_version.py"
 
 
 [tool.cibuildwheel]
@@ -74,7 +74,7 @@ test-command = "make test"
 build-verbosity = 1
 
 [tool.setuptools.package-dir]
-CellSeg = "CellSeg"
+CellMet = "CellMet"
 
 [tool.pytest.ini_options]
 minversion = "6.0"

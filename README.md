@@ -1,4 +1,4 @@
-# CellSeg
+# CellMet
 A generalist algorithm to analyse cell shape from 3D labeled image. 
 
 <p align="center">
@@ -11,12 +11,12 @@ This code is made to analyse cell shape from 3D labeled image. It is divide in t
 - We determine edges and faces associated to each cell. Quality of this analysis is dependant of the quality of the labeled image. There is no segmentation correction.
 - Analysis of cells, faces and edges. 
 
-There is a Python API to allow user to integrate CellSeg into your custom workflow.
+There is a Python API to allow user to integrate CellMet into your custom workflow.
 
 ## Input/Output and datas organisation
 ### Input
 In order to be able to use this project. You first need to segment you image using CellPose (or any other software that gives 3D label image). You need to be satisfied by your label image, since there is no manual correction (only filter can be apply to remove cells that has a volume below a threshold for example).  
-Then, you can perform 3D cell segmentation with CellSeg. 
+Then, you can perform 3D cell segmentation with CellMet. 
 
 ### Output and datas organisation
 You can generate ply/obj file for each cells.  
@@ -27,7 +27,7 @@ Datas are organised as half-edge structures. The vertex, edge, face and cell tab
 </td>
 <td >
 <p align="center">
-<img width="300" alt="image" src="https://github.com/TimSaundersLab/CellSeg/assets/17041165/ee0a6baf-7f74-4ab4-b774-4e394f9d3d36">
+<img width="300" alt="image" src="https://github.com/TimSaundersLab/CellMet/assets/17041165/ee0a6baf-7f74-4ab4-b774-4e394f9d3d36">
 </p>
 </td>
 </tr>
@@ -149,7 +149,7 @@ Prerequisite are necessary to perform the analysis. It performs 3D distance mapp
 
 There are two ways of launching the GUI : 
 - run [GUI.ipynb](https://github.com/sophietheis/Zebrafish-Muscle/blob/main/notebooks/GUI.ipynb) notebook
-- run in command line `python CellSeg/export_gui.py`
+- run in command line `python CellMet/export_gui.py`
 -->
 
 

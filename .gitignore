@@ -5,7 +5,7 @@ build/
 
 notebooks/.ipynb_checkpoints/
 
-CellSeg.egg-info/
+CellMet.egg-info/
 
 notebooks/*/*.png
 
@@ -17,6 +17,7 @@ notebooks/*/*.png
 
 *.eps
 
-CellSeg/__pycache__/
+CellMet/__pycache__/
 
 dist/
+

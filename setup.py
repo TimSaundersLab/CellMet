@@ -7,13 +7,13 @@ from setuptools import setup
 from setuptools import find_packages
 
 
-DISTNAME = 'CellSeg'
+DISTNAME = 'CellMet'
 DESCRIPTION = '3D cell segmentation from label image'
 MAINTAINER = 'Sophie THEIS'
 MAINTAINER_EMAIL = 'sophiets13@gmail.com'
-URL = 'https://github.com/TimSaundersLab/CellSeg'
+URL = 'https://github.com/TimSaundersLab/CellMet'
 LICENSE = 'MPL-2.0'
-DOWNLOAD_URL = 'https://github.com/TimSaundersLab/CellSeg.git'
+DOWNLOAD_URL = 'https://github.com/TimSaundersLab/CellMet.git'
 
 files = ['notebooks/*.*', 'data/*.*']
 
@@ -56,7 +56,7 @@ def get_version_info():
     FULLVERSION = VERSION
     if os.path.exists('.git'):
         GIT_REVISION = git_version()
-    elif os.path.exists('CellSeg/_version.py'):
+    elif os.path.exists('CellMet/_version.py'):
         # must be a source distribution, use existing version file
         try:
             from numpy.version import git_revision as GIT_REVISION
@@ -73,9 +73,9 @@ def get_version_info():
     return FULLVERSION, GIT_REVISION
 
 
-def write_version_py(filename='CellSeg/_version.py'):
+def write_version_py(filename='CellMet/_version.py'):
     cnt = """
-# THIS FILE IS GENERATED FROM CellSeg SETUP.PY
+# THIS FILE IS GENERATED FROM CellMet SETUP.PY
 #
 short_version = '%(version)s'
 version = '%(version)s'
@@ -121,7 +121,7 @@ if __name__ == "__main__":
                      ],
 
         packages=find_packages(),
-        package_data={'CellSeg': files},
+        package_data={'CellMet': files},
         include_package_data=True,
         zip_safe=False
     )

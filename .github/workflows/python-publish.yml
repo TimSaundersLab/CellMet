@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/CellSegAnalysis
+      url: https://pypi.org/p/CellMet
     permissions:
       id-token: write
     steps:

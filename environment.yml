@@ -1,4 +1,4 @@
-name: CellSeg
+name: CellMet
 channels:
 - conda-forge
 
