@@ -139,6 +139,7 @@ Plane measure :
 ## Install 
 
 See [INSTALL.md](INSTALL.md) for a step by step install. 
+A datasets to test the program can be found [here](https://doi.org/10.5281/zenodo.14177750). 
 
 <!--
 ## Graphical user interface
