@@ -1,33 +1,28 @@
 name: CellMet
 channels:
-- conda-forge
+  - conda-forge
 
 dependencies:
-- pip
-- python>=3.6
-- pip:
-  - numpy
-  - scipy
-  - matplotlib
-  - pandas
-  - pytables
-  - jupyter
-  - notebook
-  - ipywidgets
-  - pythreejs
-  - ipyvolume
-  - meshio
-  - xarray
-  - vtk
-  - tifffile
-  - skimage
-  - scipy
-  - re
-  - os
-  - sparse
-  - networkx
-  - tqdm
-  #- vispy
-  #- zarr
-  #- quantities
-  #
+  - python=3.10
+  - pip
+  - pip:
+      - numpy
+      - scipy
+      - matplotlib
+      - pandas
+      - tables
+      - jupyter
+      - joblib
+      - notebook
+      - ipywidgets
+      - pythreejs
+      - ipyvolume
+      - meshio
+      - xarray
+      - vtk
+      - tifffile
+      - scikit-image  # instead of 'skimage' which is an alias
+      - scikit-learn
+      - sparse
+      - networkx
+      - tqdm
