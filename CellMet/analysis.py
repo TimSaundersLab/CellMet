@@ -205,7 +205,7 @@ def sc_analysis_parallel(seg, c_id, degree_convert=True):
     phi = np.arctan2(maj_axis_direction[1], maj_axis_direction[0])
 
     if r3 == 0 :
-        aspect_ratio = np.NaN
+        aspect_ratio = np.nan
     else:
         aspect_ratio = r1 / r3
     elongation = r1 / np.mean([r2, r3])
