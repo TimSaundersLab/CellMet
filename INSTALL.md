@@ -31,7 +31,13 @@ cd CellMet
 Then create a virtual environment:
 
 ```bash
-conda create --name cellmet
+conda env create -f environment.yml
+```
+
+Activate CellMet environment:
+
+```bash
+conda activate CellMet
 ```
 
 Then install python:
