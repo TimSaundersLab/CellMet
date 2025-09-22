@@ -281,25 +281,31 @@ def edge_analysis(seg: Segmentation):
         df_['z'] *= seg.pixel_size["z_size"]
         df_ = df_.groupby('z').mean()
         df_.reset_index(drop=False, inplace=True)
-        # Smooth data ?
-        from scipy.interpolate import splprep, splev
-        # check if there is enough data to smooth
-        if len(df_[list("xyz")]) < 3:
-            sm_point_df = df_[list("xyz")]
+        # Check if there is enough point to do the analysis
+        if len(df_[list("xyz")]) < 2:
+            real_dist.append(np.nan)
+            short_dist.append(np.nan)
+            tort_ind.append(np.nan)
         else:
-            if len(df_[list("xyz")]) == 3:
-                tck, u = splprep(df_[list("xyz")].to_numpy().T, s=2, k=2)
+            # Smooth data ?
+            from scipy.interpolate import splprep, splev
+            # check if there is enough data to smooth
+            if len(df_[list("xyz")]) < 3:
+                sm_point_df = df_[list("xyz")]
             else:
-                tck, u = splprep(df_[list("xyz")].to_numpy().T, s=2)
-            u_fine = np.linspace(0, 1, len(df_))
-            smoothed_points = np.column_stack(splev(u_fine, tck))
-            sm_point_df = pd.DataFrame(smoothed_points, columns=list("xyz"))
-            
-        rd, sd, ci = calculate_lengths_tortuosity(sm_point_df, columns=list(
-            "xyz"))
-        real_dist.append(rd)
-        short_dist.append(sd)
-        tort_ind.append(ci)
+                if len(df_[list("xyz")]) == 3:
+                    tck, u = splprep(df_[list("xyz")].to_numpy().T, s=2, k=2)
+                else:
+                    tck, u = splprep(df_[list("xyz")].to_numpy().T, s=2)
+                u_fine = np.linspace(0, 1, len(df_))
+                smoothed_points = np.column_stack(splev(u_fine, tck))
+                sm_point_df = pd.DataFrame(smoothed_points, columns=list("xyz"))
+
+            rd, sd, ci = calculate_lengths_tortuosity(sm_point_df, columns=list(
+                "xyz"))
+            real_dist.append(rd)
+            short_dist.append(sd)
+            tort_ind.append(ci)
     edge_df["real_dist"] = real_dist
     edge_df["short_dist"] = short_dist
     edge_df["tortuosity"] = tort_ind
