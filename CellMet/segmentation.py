@@ -228,6 +228,7 @@ class Segmentation:
                         "id_im_2",
                         "id_im_3",
                         "x_center", "y_center", "z_center",
+                        "nb_pixel"
                         ]
         edge_df = pd.DataFrame(columns=edge_columns)
 
@@ -502,6 +503,7 @@ def edge_detection(seg, cell_df, cell_plane_df, edge_pixel_columns, c_id, img_ce
               "x_center": x0.mean(),
               "y_center": y0.mean(),
               "z_center": z0.mean(),
+              "nb_pixel":len(x0),
               }
     return e_pixel, e_dict
 
