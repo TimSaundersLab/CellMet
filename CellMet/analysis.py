@@ -200,15 +200,18 @@ def simplified_cell_analysis(seg):
     cell_df = pd.DataFrame(columns=["volume"])
     cell_df["id_im"] = seg.unique_id_cells
     for c_id in seg.unique_id_cells:
-        sparse_cell = sparse.load_npz(
-            os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
-        img_cell_dil = sparse_cell.todense()
-        img_cell_dil[img_cell_dil == 2] = 1
-        img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
-        volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
-        cell_df.loc[cell_df[cell_df["id_im"] == c_id].index, "volume"] = volume
-        cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
-
+        try:
+            sparse_cell = sparse.load_npz(
+                os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+            img_cell_dil = sparse_cell.todense()
+            img_cell_dil[img_cell_dil == 2] = 1
+            img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
+            volume = (len(sparse_cell.coords[0]) * seg.voxel_size)
+            cell_df.loc[cell_df[cell_df["id_im"] == c_id].index, "volume"] = volume
+            cell_df.to_csv(os.path.join(seg.storage_path, "cell_df.csv"))
+        except Exception as e:
+            print(f"Error in simplified analysis for cell id {c_id}: {e}")
+            continue
 
 def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True, metrics_to_calculate=None):
     """
@@ -320,100 +323,98 @@ def cell_analysis(seg: Segmentation, parallelized=True, degree_convert=True, met
 
 
 def sc_analysis_parallel(seg, c_id, degree_convert=True, metrics_to_calculate=None):
-    if metrics_to_calculate is None:
-        metrics_to_calculate = [name for name, info in METRIC_CALCULATORS.items() if info["type"] != "post_cell"]
+    try:
+        if metrics_to_calculate is None:
+            metrics_to_calculate = [name for name, info in METRIC_CALCULATORS.items() if info["type"] != "post_cell"]
 
-    # open image
-    sparse_cell = sparse.load_npz(
-        os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
-    img_cell_dil = sparse_cell.todense()
-    img_cell_dil[img_cell_dil == 2] = 1
-    img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
+        # open image
+        sparse_cell = sparse.load_npz(
+            os.path.join(seg.storage_path, "npz/" + str(c_id) + ".npz"))
+        img_cell_dil = sparse_cell.todense()
+        img_cell_dil[img_cell_dil == 2] = 1
+        img_cell = csimage.get_label(sparse_cell.todense(), 1).astype("uint8")
 
-    data_ = csimage.find_cell_axis_center_every_z(img_cell, seg.pixel_size,
-                                          resize_image=True)
-    
-    # Handle case where data_ is empty (e.g., cell too small or invalid)
-    if data_.empty:
-        # Return empty results for this cell
-        cell_out = {"id_im": int(c_id)}
-        for metric_name in metrics_to_calculate:
-            metric_info = METRIC_CALCULATORS.get(metric_name)
-            if metric_info and metric_info["type"] == "cell":
-                for col in metric_info["columns"]:
-                    cell_out[col] = np.nan
+        data_ = csimage.find_cell_axis_center_every_z(img_cell, seg.pixel_size,
+                                              resize_image=True)
         
-        plane_cols = ["id_im"]
+        # Handle case where data_ is empty (e.g., cell too small or invalid)
+        if data_.empty:
+            # Return empty results for this cell
+            cell_out = {"id_im": int(c_id)}
+            for metric_name in metrics_to_calculate:
+                metric_info = METRIC_CALCULATORS.get(metric_name)
+                if metric_info and metric_info["type"] == "cell":
+                    for col in metric_info["columns"]:
+                        cell_out[col] = np.nan
+            
+            plane_cols = ["id_im"]
+            for metric_name in metrics_to_calculate:
+                metric_info = METRIC_CALCULATORS.get(metric_name)
+                if metric_info and metric_info["type"] == "plane":
+                    plane_cols.extend(metric_info["columns"])
+            cell_plane_out = pd.DataFrame(columns=plane_cols)
+            return cell_out, cell_plane_out
+
+        # measure nb neighbours
+        neighbours_id, nb_neighbors_plane = csimage.find_neighbours_cell_id(
+            img_cell_dil, seg.label_image, by_plane=True, z_planes=data_[
+                "z_center"].to_numpy())
+        func_args = {
+            "sparse_cell": sparse_cell,
+            "seg": seg,
+            "img_cell": img_cell,
+            "data_": data_,
+            "degree_convert": degree_convert,
+            "pixel_size": seg.pixel_size,
+            "nb_neighbors_plane": nb_neighbors_plane
+        }
+
+        cell_out = {"id_im": int(c_id)}
+        plane_data_dict = {"id_im": np.repeat(int(c_id), len(data_["z_center"].to_numpy()))}
+
         for metric_name in metrics_to_calculate:
             metric_info = METRIC_CALCULATORS.get(metric_name)
-            if metric_info and metric_info["type"] == "plane":
-                plane_cols.extend(metric_info["columns"])
-        cell_plane_out = pd.DataFrame(columns=plane_cols)
+            if not metric_info:
+                continue
+
+            current_args = {arg: func_args.get(arg) for arg in metric_info["args"]}
+
+            if metric_info["type"] == "cell":
+                result = metric_info["func"](**current_args)
+                cell_out.update({metric_name:result})
+
+            elif metric_info["type"] == "plane":
+                result = metric_info["func"](**current_args)
+                if metric_name == "plane_centers":
+                    for col in metric_info["columns"]:
+                        if col in result.columns:
+                            plane_data_dict[col] = result[col].to_numpy()
+                elif metric_name == "plane_shape_metrics":
+                    # result is a tuple of lists (aniso, ox, oy, maj, mi, ar, per, cir)
+                    for i, col in enumerate(metric_info["columns"]):
+                        plane_data_dict[col] = np.array(result[i])
+                elif metric_name == "plane_nb_neighbor":
+                    plane_data_dict[metric_info["columns"][0]] = result # result is nb_neighbors_plane array
+
+        # Create cell_plane_out DataFrame
+        if plane_data_dict and len(data_["z_center"].to_numpy()) > 0:
+            # Ensure all arrays in plane_data_dict have the same length before creating DataFrame
+            first_key = next(iter(plane_data_dict))
+            expected_len = len(plane_data_dict[first_key])
+            cell_plane_out = pd.DataFrame(plane_data_dict)
+        else:
+            # If no plane metrics were requested or no planes found, create an empty DataFrame with appropriate columns
+            plane_cols = ["id_im"]
+            for metric_name in metrics_to_calculate:
+                metric_info = METRIC_CALCULATORS.get(metric_name)
+                if metric_info and metric_info["type"] == "plane":
+                    plane_cols.extend(metric_info["columns"])
+            cell_plane_out = pd.DataFrame(columns=plane_cols)
+
         return cell_out, cell_plane_out
-
-    # measure nb neighbours
-    neighbours_id, nb_neighbors_plane = csimage.find_neighbours_cell_id(
-        img_cell_dil, seg.label_image, by_plane=True, z_planes=data_[
-            "z_center"].to_numpy())
-    func_args = {
-        "sparse_cell": sparse_cell,
-        "seg": seg,
-        "img_cell": img_cell,
-        "data_": data_,
-        "degree_convert": degree_convert,
-        "pixel_size": seg.pixel_size,
-        "nb_neighbors_plane": nb_neighbors_plane
-    }
-
-    cell_out = {"id_im": int(c_id)}
-    plane_data_dict = {"id_im": np.repeat(int(c_id), len(data_["z_center"].to_numpy()))}
-
-    for metric_name in metrics_to_calculate:
-        metric_info = METRIC_CALCULATORS.get(metric_name)
-        if not metric_info:
-            continue
-
-        current_args = {arg: func_args.get(arg) for arg in metric_info["args"]}
-
-        if metric_info["type"] == "cell":
-            result = metric_info["func"](**current_args)
-            cell_out.update({metric_name:result})
-
-        elif metric_info["type"] == "plane":
-            result = metric_info["func"](**current_args)
-            if metric_name == "plane_centers":
-                for col in metric_info["columns"]:
-                    if col in result.columns:
-                        plane_data_dict[col] = result[col].to_numpy()
-            elif metric_name == "plane_shape_metrics":
-                # result is a tuple of lists (aniso, ox, oy, maj, mi, ar, per, cir)
-                for i, col in enumerate(metric_info["columns"]):
-                    plane_data_dict[col] = np.array(result[i])
-            elif metric_name == "plane_nb_neighbor":
-                plane_data_dict[metric_info["columns"][0]] = result # result is nb_neighbors_plane array
-
-    # Create cell_plane_out DataFrame
-    if plane_data_dict and len(data_["z_center"].to_numpy()) > 0:
-        # Ensure all arrays in plane_data_dict have the same length before creating DataFrame
-        # This is crucial for creating a DataFrame from a dictionary of arrays
-        first_key = next(iter(plane_data_dict))
-        expected_len = len(plane_data_dict[first_key])
-        for key, arr in plane_data_dict.items():
-            if len(arr) != expected_len:
-                # This indicates an inconsistency, fill with NaNs for missing data
-                # For now, let's assume consistency or it will fail at DataFrame creation
-                pass
-        cell_plane_out = pd.DataFrame(plane_data_dict)
-    else:
-        # If no plane metrics were requested or no planes found, create an empty DataFrame with appropriate columns
-        plane_cols = ["id_im"]
-        for metric_name in metrics_to_calculate:
-            metric_info = METRIC_CALCULATORS.get(metric_name)
-            if metric_info and metric_info["type"] == "plane":
-                plane_cols.extend(metric_info["columns"])
-        cell_plane_out = pd.DataFrame(columns=plane_cols)
-
-    return cell_out, cell_plane_out
+    except Exception as e:
+        print(f"Error in cell analysis for cell id {c_id}: {e}")
+        return {"id_im": int(c_id)}, pd.DataFrame()
 
 
 def edge_analysis(seg: Segmentation, metrics_to_calculate=None):
@@ -440,10 +441,14 @@ def edge_analysis(seg: Segmentation, metrics_to_calculate=None):
     if "edge_tortuosity_metrics" in metrics_to_calculate:
         real_dist, short_dist, tort_ind = [], [], []
         for id_, [c1, c2, c3] in edge_df[['id_im_1', 'id_im_2', 'id_im_3']].iterrows():
-            df_ = edge_pixel_df[(edge_pixel_df['id_im_1'] == c1) &
-                                (edge_pixel_df['id_im_2'] == c2) &
-                                (edge_pixel_df['id_im_3'] == c3)]
-            rd, sd, ci = _calculate_edge_tortuosity_for_edge(df_, seg)
+            try:
+                df_ = edge_pixel_df[(edge_pixel_df['id_im_1'] == c1) &
+                                    (edge_pixel_df['id_im_2'] == c2) &
+                                    (edge_pixel_df['id_im_3'] == c3)]
+                rd, sd, ci = _calculate_edge_tortuosity_for_edge(df_, seg)
+            except Exception as e:
+                print(f"Error in edge tortuosity analysis for edge {c1}-{c2}-{c3}: {e}")
+                rd, sd, ci = np.nan, np.nan, np.nan
             real_dist.append(rd)
             short_dist.append(sd)
             tort_ind.append(ci)
@@ -458,7 +463,11 @@ def edge_analysis(seg: Segmentation, metrics_to_calculate=None):
             df_ = edge_pixel_df[(edge_pixel_df['id_im_1'] == c1) &
                                 (edge_pixel_df['id_im_2'] == c2) &
                                 (edge_pixel_df['id_im_3'] == c3)]
-            rotation.extend(_calculate_edge_rotation_for_edge(df_, seg))
+            try:
+                rotation.extend(_calculate_edge_rotation_for_edge(df_, seg))
+            except Exception as e:
+                print(f"Error in edge rotation analysis for edge {c1}-{c2}-{c3}: {e}")
+                rotation.extend([np.nan] * len(df_))
         edge_pixel_df["rotation"] = rotation
 
     edge_df.to_csv(edge_df_path)
@@ -521,17 +530,20 @@ def face_analysis(seg: Segmentation, metrics_to_calculate=None):
                 ff_id = csutils.remove_duplicate_arrays(ff_id)
 
                 for f_id in ff_id:
-                    id_im_1 = face_df.loc[f_id].iloc[0]["id_im_1"]
-                    id_im_2 = face_df.loc[f_id].iloc[0]["id_im_2"]
+                    try:
+                        id_im_1 = face_df.loc[f_id].iloc[0]["id_im_1"]
+                        id_im_2 = face_df.loc[f_id].iloc[0]["id_im_2"]
 
-                    points_3D = face_pixel_df[((face_pixel_df["id_im_1"] == id_im_1) & (
-                            face_pixel_df["id_im_2"] == id_im_2))][
-                                    list("xyz")].to_numpy() * list(seg.pixel_size.values())
+                        points_3D = face_pixel_df[((face_pixel_df["id_im_1"] == id_im_1) & (
+                                face_pixel_df["id_im_2"] == id_im_2))][
+                                        list("xyz")].to_numpy() * list(seg.pixel_size.values())
 
-                    results = _calculate_face_geometric_metrics(points_3D)
-                    face_df.loc[f_id, 'area'] = results['area']
-                    face_df.loc[f_id, 'perimeter'] = results['perimeter']
-                    face_df.loc[f_id, 'flatness'] = results['flatness']
+                        results = _calculate_face_geometric_metrics(points_3D)
+                        face_df.loc[f_id, 'area'] = results['area']
+                        face_df.loc[f_id, 'perimeter'] = results['perimeter']
+                        face_df.loc[f_id, 'flatness'] = results['flatness']
+                    except Exception as e:
+                        print(f"Error in face geometric analysis for face id {f_id}: {e}")
 
                 face_df.to_csv(face_df_path)
 
