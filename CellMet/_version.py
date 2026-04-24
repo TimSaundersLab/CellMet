@@ -1,10 +1,10 @@
 
 # THIS FILE IS GENERATED FROM CellMet SETUP.PY
 #
-short_version = '0.9.1'
-version = '0.9.1'
-full_version = '0.9.1.dev0+0c83190'
-git_revision = '0c831902c22ccaba1ecec187426ef8ffdb4bff42'
+short_version = '1.1.0'
+version = '1.1.0'
+full_version = '1.1.0.dev0+b78f9a0'
+git_revision = 'b78f9a0599e20f5e89e076756689bada63708199'
 release = False
 if not release:
     version = full_version
